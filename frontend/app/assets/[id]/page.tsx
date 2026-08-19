@@ -26,8 +26,9 @@ export default function AssetDetail() {
       setAsset(a);
       setOptions(o);
       setMove((m) => ({ ...m, toLocationId: a.currentLocationId || "" }));
+      const assetUrl = `${window.location.origin}/assets/${a.id}`;
       setQr(
-        await QRCode.toDataURL(a.qrValue, {
+        await QRCode.toDataURL(assetUrl, {
           width: 260,
           margin: 2,
           errorCorrectionLevel: "M",
@@ -91,8 +92,12 @@ export default function AssetDetail() {
           </div>
           <dl className="details">
             <D t="Product" v={asset.product?.name} />
+            <D t="SKU" v={asset.product?.sku} />
+            <D t="Manufacturer" v={asset.product?.manufacturer} />
+            <D t="Product description" v={asset.product?.description} />
             <D t="Category" v={asset.category?.name} />
             <D t="Serial number" v={asset.serialNumber} />
+            <D t="QR identifier" v={asset.qrValue} />
             <D t="Vendor" v={asset.vendor?.name} />
             <D t="Purchase order" v={asset.purchaseOrder?.poNumber} />
             <D
@@ -103,6 +108,8 @@ export default function AssetDetail() {
                   : null
               }
             />
+            <D t="Purchase date" v={fmt(asset.purchaseDate)} />
+            <D t="Commissioning date" v={fmt(asset.commissioningDate)} />
             <D t="Department" v={asset.department?.name} />
             <D t="Custodian" v={asset.custodian?.name} />
             <D t="Current location" v={asset.currentLocation?.name} />
@@ -116,6 +123,7 @@ export default function AssetDetail() {
           {qr && <img src={qr} alt={`QR for ${asset.assetTag}`} />}
           <strong>{asset.assetTag}</strong>
           <span>{asset.product?.name}</span>
+          <small>Scan to view the complete asset record</small>
           <button className="btn noPrint" onClick={() => window.print()}>
             Print label
           </button>
@@ -214,6 +222,24 @@ export default function AssetDetail() {
           {asset.documents.map((document: any) => <tr key={document.id}><td>{document.type}</td><td>{document.name}</td><td>{document.size ? `${Math.ceil(document.size / 1024)} KB` : "—"}</td><td>{new Date(document.uploadedAt).toLocaleString()}</td><td><div className="rowActions"><button onClick={() => download(document.url, document.name)}>Download</button><button className="danger" onClick={() => removeDocument(document.id)}>Delete</button></div></td></tr>)}
           {!asset.documents.length && <tr><td colSpan={5} className="empty">No documents uploaded.</td></tr>}
         </tbody></table>
+      </section>
+      <section className="card section noPrint">
+        <h3>Maintenance history</h3>
+        <div className="tableWrap"><table className="table"><thead><tr><th>Ticket</th><th>Type</th><th>Status</th><th>Priority</th><th>Started</th><th>Completed</th><th>Cost</th></tr></thead><tbody>
+          {asset.maintenance.map((record: any) => <tr key={record.id}><td>{record.ticketNumber}</td><td>{record.type}</td><td><span className="badge">{record.status}</span></td><td>{record.priority}</td><td>{fmt(record.startedAt)}</td><td>{fmt(record.completedAt)}</td><td>{record.cost == null ? "—" : `₹${Number(record.cost).toLocaleString("en-IN")}`}</td></tr>)}
+          {!asset.maintenance.length && <tr><td colSpan={7} className="empty">No maintenance records.</td></tr>}
+        </tbody></table></div>
+      </section>
+      <section className="card section noPrint">
+        <h3>Compliance history</h3>
+        <div className="tableWrap"><table className="table"><thead><tr><th>Type</th><th>Reference</th><th>Provider</th><th>Start</th><th>Due</th><th>Completed</th><th>Notes</th></tr></thead><tbody>
+          {asset.complianceRecords.map((record: any) => <tr key={record.id}><td>{record.type}</td><td>{record.referenceNumber || "—"}</td><td>{record.providerName || "—"}</td><td>{fmt(record.startDate)}</td><td>{fmt(record.dueDate)}</td><td>{fmt(record.completedDate)}</td><td>{record.notes || "—"}</td></tr>)}
+          {!asset.complianceRecords.length && <tr><td colSpan={7} className="empty">No compliance records.</td></tr>}
+        </tbody></table></div>
+      </section>
+      <section className="card section noPrint">
+        <h3>Disposal record</h3>
+        {asset.disposal ? <dl className="details"><D t="Status" v={asset.disposal.status} /><D t="Method" v={asset.disposal.method} /><D t="Reason" v={asset.disposal.reason} /><D t="Proposed date" v={fmt(asset.disposal.proposedAt)} /><D t="Approved date" v={fmt(asset.disposal.approvedAt)} /><D t="Completed date" v={fmt(asset.disposal.completedAt)} /><D t="Proposed value" v={asset.disposal.proposedValue == null ? null : `₹${Number(asset.disposal.proposedValue).toLocaleString("en-IN")}`} /><D t="Realized value" v={asset.disposal.realizedValue == null ? null : `₹${Number(asset.disposal.realizedValue).toLocaleString("en-IN")}`} /></dl> : <p className="empty">No disposal record.</p>}
       </section>
       <section className="card section noPrint">
         <h3>Custody history</h3>
