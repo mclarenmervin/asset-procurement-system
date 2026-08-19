@@ -76,7 +76,7 @@ Backend variables are documented in `backend/.env.example`:
 - `FRONTEND_URL` — comma-separated exact CORS origins
 - `NODE_ENV` — `development` or `production`
 
-The frontend uses `NEXT_PUBLIC_API_URL`; its local example points to `http://localhost:5001/api`.
+The frontend uses `NEXT_PUBLIC_API_URL` for the API and `NEXT_PUBLIC_APP_URL` as the base URL encoded in printable QR labels. Set `NEXT_PUBLIC_APP_URL` to the deployed HTTPS origin (or a reachable LAN address during phone testing), never `localhost` for labels that will be scanned by another device.
 
 ## Build and verification
 

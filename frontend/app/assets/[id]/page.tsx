@@ -26,7 +26,8 @@ export default function AssetDetail() {
       setAsset(a);
       setOptions(o);
       setMove((m) => ({ ...m, toLocationId: a.currentLocationId || "" }));
-      const assetUrl = `${window.location.origin}/assets/${a.id}`;
+      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, "");
+      const assetUrl = `${appUrl}/assets/${a.id}`;
       setQr(
         await QRCode.toDataURL(assetUrl, {
           width: 260,
