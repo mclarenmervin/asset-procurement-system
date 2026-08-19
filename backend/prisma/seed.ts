@@ -1,0 +1,15 @@
+import { PrismaClient } from '@prisma/client'; import bcrypt from 'bcryptjs'; const p=new PrismaClient();
+async function main(){
+ const org=await p.organization.upsert({where:{code:'DEMO-OMC'},update:{},create:{name:'Demo Mining Corporation',code:'DEMO-OMC'}});
+ const mechanical=await p.department.upsert({where:{organizationId_code:{organizationId:org.id,code:'MECH'}},update:{},create:{name:'Mechanical',code:'MECH',organizationId:org.id}});
+ const store=await p.location.upsert({where:{organizationId_code:{organizationId:org.id,code:'CENTRAL'}},update:{},create:{name:'Central Store',code:'CENTRAL',type:'Warehouse',organizationId:org.id}});
+ const plant=await p.location.upsert({where:{organizationId_code:{organizationId:org.id,code:'BAR-PLANT2'}},update:{},create:{name:'Barbil Plant 2',code:'BAR-PLANT2',type:'Plant',organizationId:org.id}});
+ const vendor=await p.vendor.upsert({where:{organizationId_code:{organizationId:org.id,code:'ABC'}},update:{},create:{name:'ABC Industrial Systems Pvt Ltd',code:'ABC',gstin:'21ABCDE1234F1Z5',email:'sales@example.com',phone:'+91 9876543210',rating:4.4,organizationId:org.id}});
+ const cat=await p.assetCategory.upsert({where:{organizationId_code:{organizationId:org.id,code:'PUMP'}},update:{},create:{name:'Industrial Pumps',code:'PUMP',depreciationRate:10,organizationId:org.id}});
+ const product=await p.product.upsert({where:{organizationId_sku:{organizationId:org.id,sku:'PUMP-50HP'}},update:{},create:{name:'50 HP Industrial Pump',sku:'PUMP-50HP',manufacturer:'Demo Pumps',organizationId:org.id,categoryId:cat.id}});
+ let po=await p.purchaseOrder.findUnique({where:{organizationId_poNumber:{organizationId:org.id,poNumber:'PO-2026-00125'}}}); if(!po) po=await p.purchaseOrder.create({data:{poNumber:'PO-2026-00125',poDate:new Date('2026-08-01'),status:'RECEIVED',totalAmount:2450000,vendorId:vendor.id,organizationId:org.id,items:{create:{productId:product.id,quantity:10,unitPrice:245000}}}});
+ const exists=await p.asset.findUnique({where:{organizationId_assetTag:{organizationId:org.id,assetTag:'DEMO-BAR-PUMP-00021'}}}); if(!exists){ const a=await p.asset.create({data:{assetTag:'DEMO-BAR-PUMP-00021',serialNumber:'P50-2026-0021',qrValue:'ASSET:DEMO-BAR-PUMP-00021',status:'IN_USE',purchasePrice:245000,purchaseDate:new Date('2026-08-01'),warrantyEndDate:new Date('2029-08-01'),organizationId:org.id,productId:product.id,categoryId:cat.id,vendorId:vendor.id,purchaseOrderId:po.id,departmentId:mechanical.id,currentLocationId:plant.id}}); await p.assetMovement.create({data:{assetId:a.id,type:'RECEIPT',toLocationId:store.id,remarks:'Received against PO'}}); await p.assetMovement.create({data:{assetId:a.id,type:'ISSUE',fromLocationId:store.id,toLocationId:plant.id,remarks:'Issued to Mechanical Department'}}); }
+ const hash=await bcrypt.hash('Admin@123',12); await p.user.upsert({where:{email:'admin@demo.local'},update:{passwordHash:hash},create:{name:'Demo Administrator',email:'admin@demo.local',passwordHash:hash,role:'SUPER_ADMIN',organizationId:org.id}});
+ console.log('Seeded. Login: admin@demo.local / Admin@123');
+}
+main().finally(()=>p.$disconnect());
