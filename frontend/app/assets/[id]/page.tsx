@@ -79,12 +79,12 @@ export default function AssetDetail() {
   }
   if (!asset)
     return (
-      <Shell title="Asset Details">
+      <Shell title="Asset Details" back={{href: "/assets", label: "Asset Registry"}}>
         <p>{error || "Loading…"}</p>
       </Shell>
     );
   return (
-    <Shell title={asset.assetTag}>
+    <Shell title={asset.assetTag} back={{href: "/assets", label: "Asset Registry"}}>
       <div className="detailGrid">
         <section className="card">
           <div className="sectionHead">
