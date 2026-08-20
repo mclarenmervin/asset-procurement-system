@@ -3,8 +3,17 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "../../lib/api";
 import { Shell } from "../_components";
+import { FilterBar, filterRows, unique } from "../_filters";
 export default function Dashboard() {
-  const [d, setD] = useState<any>(null);
+  const [d, setD] = useState<any>(null),
+    [query, setQuery] = useState(""),
+    [status, setStatus] = useState("");
+  const movements = filterRows(
+    d?.recentMovements || [],
+    query,
+    status,
+    (row: any) => row.type,
+  );
   useEffect(() => {
     api("/dashboard")
       .then(setD)
@@ -25,6 +34,18 @@ export default function Dashboard() {
           </div>
           <div className="card section tableWrap">
             <h3>Recent Asset Movement</h3>
+            <FilterBar
+              query={query}
+              setQuery={setQuery}
+              status={status}
+              setStatus={setStatus}
+              statuses={unique(
+                (d.recentMovements || []).map((row: any) => row.type),
+              )}
+              statusLabel="All movement types"
+              count={movements.length}
+              total={d.recentMovements.length}
+            />
             <table className="table">
               <thead>
                 <tr>
@@ -36,7 +57,7 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {d.recentMovements.map((m: any) => (
+                {movements.map((m: any) => (
                   <tr key={m.id}>
                     <td>
                       <Link

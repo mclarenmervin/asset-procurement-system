@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { Shell } from "../_components";
+import { FilterBar, filterRows, unique } from "../_filters";
 export default function Inventory() {
   const [tab, setTab] = useState("stock"),
     [data, setData] = useState<any>({
@@ -19,7 +20,30 @@ export default function Inventory() {
       locations: [],
     }),
     [form, setForm] = useState(""),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [query, setQuery] = useState(""),
+    [status, setStatus] = useState("");
+  const activeRows =
+    tab === "stock"
+      ? data.batches
+      : tab === "grn"
+        ? data.grns
+        : tab === "notes"
+          ? data.notes
+          : tab === "warehouses"
+            ? data.warehouses
+            : data.ledger;
+  const statusOf = (row: any) =>
+    tab === "stock"
+      ? row.quantity > 0
+        ? "AVAILABLE"
+        : "OUT_OF_STOCK"
+      : tab === "warehouses"
+        ? row.active === false
+          ? "INACTIVE"
+          : "ACTIVE"
+        : row.status || row.type;
+  const filteredRows = filterRows(activeRows, query, status, statusOf);
   async function load() {
     try {
       const [warehouses, grns, batches, ledger, notes, options, locations] =
@@ -65,6 +89,8 @@ export default function Inventory() {
             onClick={() => {
               setTab(k);
               setForm("");
+              setQuery("");
+              setStatus("");
             }}
           >
             {v}
@@ -72,7 +98,17 @@ export default function Inventory() {
         ))}
       </div>
       {error && <p className="error">{error}</p>}
-      {tab === "stock" && <Stock batches={data.batches} />}{" "}
+      <FilterBar
+        query={query}
+        setQuery={setQuery}
+        status={status}
+        setStatus={setStatus}
+        statuses={unique(activeRows.map(statusOf))}
+        statusLabel="All states/types"
+        count={filteredRows.length}
+        total={activeRows.length}
+      />
+      {tab === "stock" && <Stock batches={filteredRows} />}{" "}
       {tab === "grn" && (
         <>
           <Bar
@@ -87,7 +123,7 @@ export default function Inventory() {
             />
           )}
           <Grns
-            rows={data.grns}
+            rows={filteredRows}
             inspect={(g: any) => setForm(g.id)}
             save={save}
           />
@@ -107,7 +143,7 @@ export default function Inventory() {
             />
           )}
           <Notes
-            rows={data.notes}
+            rows={filteredRows}
             post={(id: string) => save("/inventory/notes/" + id + "/post", {})}
           />
         </>
@@ -126,7 +162,7 @@ export default function Inventory() {
             />
           )}
           <Warehouses
-            rows={data.warehouses}
+            rows={filteredRows}
             addBin={async (id: string) => {
               const name = prompt("Bin name");
               const code = prompt("Bin code");
@@ -136,7 +172,7 @@ export default function Inventory() {
           />
         </>
       )}
-      {tab === "ledger" && <Ledger rows={data.ledger} />}
+      {tab === "ledger" && <Ledger rows={filteredRows} />}
     </Shell>
   );
 }
@@ -288,13 +324,14 @@ function GrnForm({ options, save, close }: any) {
             }
           >
             <option value="">No bin</option>
-            {(options.warehouses.find((w: any) => w.id === f.warehouseId)?.bins || []).map(
-              (bin: any) => (
-                <option key={bin.id} value={bin.id}>
-                  {bin.code} · {bin.name}
-                </option>
-              ),
-            )}
+            {(
+              options.warehouses.find((w: any) => w.id === f.warehouseId)
+                ?.bins || []
+            ).map((bin: any) => (
+              <option key={bin.id} value={bin.id}>
+                {bin.code} · {bin.name}
+              </option>
+            ))}
           </select>
         </div>
       </div>

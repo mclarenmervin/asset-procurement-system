@@ -13,6 +13,7 @@ AssetFlow Enterprise is a full-stack asset, procurement and material-management 
 - Configurable approval workflow templates
 - Camera or manual QR physical verification with GPS, wrong-location and missing-asset detection
 - Dashboard analytics and authenticated CSV exports for assets, movements, procurement, stock, maintenance and verification
+- Consistent live search and contextual status/type filters across registers, workflows, histories, audit data and reports
 - JWT authentication, signup, role permissions, tenant isolation and request validation
 - Security headers, strict origin allowlist, API/login rate limits, compression, request IDs and database readiness checks
 

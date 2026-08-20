@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { Shell } from "../_components";
+import { FilterBar, filterRows, unique } from "../_filters";
 const emptyItem = {
   productId: "",
   quantity: 1,
@@ -20,7 +21,20 @@ export default function Procurement() {
       rfqs: [],
     }),
     [form, setForm] = useState<boolean | "rfq" | "quote">(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [query, setQuery] = useState(""),
+    [status, setStatus] = useState("");
+  const activeRows =
+    tab === "requisitions" ? reqs : tab === "rfqs" ? rfqs : pos;
+  const filteredRows = filterRows(
+    activeRows,
+    query,
+    status,
+    (row: any) => row.status,
+  );
+  const visibleReqs = tab === "requisitions" ? filteredRows : reqs,
+    visibleRfqs = tab === "rfqs" ? filteredRows : rfqs,
+    visiblePos = tab === "orders" ? filteredRows : pos;
   async function load() {
     try {
       const [r, f, p, o] = await Promise.all([
@@ -66,6 +80,8 @@ export default function Procurement() {
             onClick={() => {
               setTab(k);
               setForm(false);
+              setQuery("");
+              setStatus("");
             }}
           >
             {v}
@@ -73,6 +89,15 @@ export default function Procurement() {
         ))}
       </div>
       {error && <p className="error">{error}</p>}
+      <FilterBar
+        query={query}
+        setQuery={setQuery}
+        status={status}
+        setStatus={setStatus}
+        statuses={unique(activeRows.map((row: any) => row.status))}
+        count={filteredRows.length}
+        total={activeRows.length}
+      />
       {tab === "requisitions" && (
         <>
           <Head title="Purchase Requisitions" add={() => setForm(true)} />
@@ -97,7 +122,7 @@ export default function Procurement() {
                 </tr>
               </thead>
               <tbody>
-                {reqs.map((r) => (
+                {visibleReqs.map((r: any) => (
                   <tr key={r.id}>
                     <td>{r.requisitionNumber}</td>
                     <td>
@@ -189,7 +214,7 @@ export default function Procurement() {
             />
           )}
           <div className="section">
-            {rfqs.map((r) => (
+            {visibleRfqs.map((r: any) => (
               <section className="card rfq" key={r.id}>
                 <div className="sectionHead">
                   <div>
@@ -277,7 +302,7 @@ export default function Procurement() {
                 </tr>
               </thead>
               <tbody>
-                {pos.map((po) => (
+                {visiblePos.map((po: any) => (
                   <tr key={po.id}>
                     <td>{po.poNumber}</td>
                     <td>{date(po.poDate)}</td>

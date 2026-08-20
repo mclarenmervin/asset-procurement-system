@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import QRCode from "qrcode";
 import { api, download, upload } from "../../../lib/api";
 import { Shell } from "../../_components";
+import { FilterBar, filterRows } from "../../_filters";
 export default function AssetDetail() {
   const { id } = useParams<{ id: string }>(),
     [asset, setAsset] = useState<any>(null),
@@ -16,7 +17,23 @@ export default function AssetDetail() {
     }),
     [documentType, setDocumentType] = useState("INVOICE"),
     [file, setFile] = useState<File | null>(null),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [historyQuery, setHistoryQuery] = useState("");
+  const historyGroups = [
+    asset?.movements || [],
+    asset?.documents || [],
+    asset?.maintenance || [],
+    asset?.complianceRecords || [],
+    asset?.assignments || [],
+  ];
+  const filteredHistory = historyGroups.map((rows) =>
+    filterRows(rows, historyQuery),
+  );
+  const historyTotal = historyGroups.reduce(
+      (sum, rows) => sum + rows.length,
+      0,
+    ),
+    historyCount = filteredHistory.reduce((sum, rows) => sum + rows.length, 0);
   async function load() {
     try {
       const [a, o] = await Promise.all([
@@ -26,7 +43,9 @@ export default function AssetDetail() {
       setAsset(a);
       setOptions(o);
       setMove((m) => ({ ...m, toLocationId: a.currentLocationId || "" }));
-      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, "");
+      const appUrl = (
+        process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+      ).replace(/\/$/, "");
       const assetUrl = `${appUrl}/assets/${a.id}`;
       setQr(
         await QRCode.toDataURL(assetUrl, {
@@ -79,12 +98,18 @@ export default function AssetDetail() {
   }
   if (!asset)
     return (
-      <Shell title="Asset Details" back={{href: "/assets", label: "Asset Registry"}}>
+      <Shell
+        title="Asset Details"
+        back={{ href: "/assets", label: "Asset Registry" }}
+      >
         <p>{error || "Loading…"}</p>
       </Shell>
     );
   return (
-    <Shell title={asset.assetTag} back={{href: "/assets", label: "Asset Registry"}}>
+    <Shell
+      title={asset.assetTag}
+      back={{ href: "/assets", label: "Asset Registry" }}
+    >
       <div className="detailGrid">
         <section className="card">
           <div className="sectionHead">
@@ -130,6 +155,15 @@ export default function AssetDetail() {
           </button>
         </section>
       </div>
+      <section className="card section noPrint">
+        <h3>Filter asset history</h3>
+        <FilterBar
+          query={historyQuery}
+          setQuery={setHistoryQuery}
+          count={historyCount}
+          total={historyTotal}
+        />
+      </section>
       <section className="card section noPrint">
         <h3>Record movement</h3>
         {error && <p className="error">{error}</p>}
@@ -195,7 +229,7 @@ export default function AssetDetail() {
               </tr>
             </thead>
             <tbody>
-              {asset.movements.map((m: any) => (
+              {filteredHistory[0].map((m: any) => (
                 <tr key={m.id}>
                   <td>{new Date(m.movedAt).toLocaleString()}</td>
                   <td>
@@ -206,6 +240,13 @@ export default function AssetDetail() {
                   <td>{m.remarks || "—"}</td>
                 </tr>
               ))}
+              {!filteredHistory[0].length && (
+                <tr>
+                  <td colSpan={5} className="empty">
+                    No movements match the history filter.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -213,34 +254,191 @@ export default function AssetDetail() {
       <section className="card section noPrint">
         <h3>Documents</h3>
         <form className="documentForm" onSubmit={uploadDocument}>
-          <select className="input" value={documentType} onChange={(e) => setDocumentType(e.target.value)}>
-            {["INVOICE", "WARRANTY", "INSPECTION", "MANUAL", "CERTIFICATE", "OTHER"].map((type) => <option key={type}>{type}</option>)}
+          <select
+            className="input"
+            value={documentType}
+            onChange={(e) => setDocumentType(e.target.value)}
+          >
+            {[
+              "INVOICE",
+              "WARRANTY",
+              "INSPECTION",
+              "MANUAL",
+              "CERTIFICATE",
+              "OTHER",
+            ].map((type) => (
+              <option key={type}>{type}</option>
+            ))}
           </select>
-          <input required className="input" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.doc,.docx" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+          <input
+            required
+            className="input"
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.doc,.docx"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+          />
           <button className="btn">Upload</button>
         </form>
-        <table className="table"><thead><tr><th>Type</th><th>File</th><th>Size</th><th>Uploaded</th><th>Actions</th></tr></thead><tbody>
-          {asset.documents.map((document: any) => <tr key={document.id}><td>{document.type}</td><td>{document.name}</td><td>{document.size ? `${Math.ceil(document.size / 1024)} KB` : "—"}</td><td>{new Date(document.uploadedAt).toLocaleString()}</td><td><div className="rowActions"><button onClick={() => download(document.url, document.name)}>Download</button><button className="danger" onClick={() => removeDocument(document.id)}>Delete</button></div></td></tr>)}
-          {!asset.documents.length && <tr><td colSpan={5} className="empty">No documents uploaded.</td></tr>}
-        </tbody></table>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>File</th>
+              <th>Size</th>
+              <th>Uploaded</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredHistory[1].map((document: any) => (
+              <tr key={document.id}>
+                <td>{document.type}</td>
+                <td>{document.name}</td>
+                <td>
+                  {document.size
+                    ? `${Math.ceil(document.size / 1024)} KB`
+                    : "—"}
+                </td>
+                <td>{new Date(document.uploadedAt).toLocaleString()}</td>
+                <td>
+                  <div className="rowActions">
+                    <button
+                      onClick={() => download(document.url, document.name)}
+                    >
+                      Download
+                    </button>
+                    <button
+                      className="danger"
+                      onClick={() => removeDocument(document.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {!filteredHistory[1].length && (
+              <tr>
+                <td colSpan={5} className="empty">
+                  No documents match the history filter.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </section>
       <section className="card section noPrint">
         <h3>Maintenance history</h3>
-        <div className="tableWrap"><table className="table"><thead><tr><th>Ticket</th><th>Type</th><th>Status</th><th>Priority</th><th>Started</th><th>Completed</th><th>Cost</th></tr></thead><tbody>
-          {asset.maintenance.map((record: any) => <tr key={record.id}><td>{record.ticketNumber}</td><td>{record.type}</td><td><span className="badge">{record.status}</span></td><td>{record.priority}</td><td>{fmt(record.startedAt)}</td><td>{fmt(record.completedAt)}</td><td>{record.cost == null ? "—" : `₹${Number(record.cost).toLocaleString("en-IN")}`}</td></tr>)}
-          {!asset.maintenance.length && <tr><td colSpan={7} className="empty">No maintenance records.</td></tr>}
-        </tbody></table></div>
+        <div className="tableWrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Ticket</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Started</th>
+                <th>Completed</th>
+                <th>Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredHistory[2].map((record: any) => (
+                <tr key={record.id}>
+                  <td>{record.ticketNumber}</td>
+                  <td>{record.type}</td>
+                  <td>
+                    <span className="badge">{record.status}</span>
+                  </td>
+                  <td>{record.priority}</td>
+                  <td>{fmt(record.startedAt)}</td>
+                  <td>{fmt(record.completedAt)}</td>
+                  <td>
+                    {record.cost == null
+                      ? "—"
+                      : `₹${Number(record.cost).toLocaleString("en-IN")}`}
+                  </td>
+                </tr>
+              ))}
+              {!filteredHistory[2].length && (
+                <tr>
+                  <td colSpan={7} className="empty">
+                    No maintenance records match the history filter.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
       <section className="card section noPrint">
         <h3>Compliance history</h3>
-        <div className="tableWrap"><table className="table"><thead><tr><th>Type</th><th>Reference</th><th>Provider</th><th>Start</th><th>Due</th><th>Completed</th><th>Notes</th></tr></thead><tbody>
-          {asset.complianceRecords.map((record: any) => <tr key={record.id}><td>{record.type}</td><td>{record.referenceNumber || "—"}</td><td>{record.providerName || "—"}</td><td>{fmt(record.startDate)}</td><td>{fmt(record.dueDate)}</td><td>{fmt(record.completedDate)}</td><td>{record.notes || "—"}</td></tr>)}
-          {!asset.complianceRecords.length && <tr><td colSpan={7} className="empty">No compliance records.</td></tr>}
-        </tbody></table></div>
+        <div className="tableWrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Reference</th>
+                <th>Provider</th>
+                <th>Start</th>
+                <th>Due</th>
+                <th>Completed</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredHistory[3].map((record: any) => (
+                <tr key={record.id}>
+                  <td>{record.type}</td>
+                  <td>{record.referenceNumber || "—"}</td>
+                  <td>{record.providerName || "—"}</td>
+                  <td>{fmt(record.startDate)}</td>
+                  <td>{fmt(record.dueDate)}</td>
+                  <td>{fmt(record.completedDate)}</td>
+                  <td>{record.notes || "—"}</td>
+                </tr>
+              ))}
+              {!filteredHistory[3].length && (
+                <tr>
+                  <td colSpan={7} className="empty">
+                    No compliance records match the history filter.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
       <section className="card section noPrint">
         <h3>Disposal record</h3>
-        {asset.disposal ? <dl className="details"><D t="Status" v={asset.disposal.status} /><D t="Method" v={asset.disposal.method} /><D t="Reason" v={asset.disposal.reason} /><D t="Proposed date" v={fmt(asset.disposal.proposedAt)} /><D t="Approved date" v={fmt(asset.disposal.approvedAt)} /><D t="Completed date" v={fmt(asset.disposal.completedAt)} /><D t="Proposed value" v={asset.disposal.proposedValue == null ? null : `₹${Number(asset.disposal.proposedValue).toLocaleString("en-IN")}`} /><D t="Realized value" v={asset.disposal.realizedValue == null ? null : `₹${Number(asset.disposal.realizedValue).toLocaleString("en-IN")}`} /></dl> : <p className="empty">No disposal record.</p>}
+        {asset.disposal ? (
+          <dl className="details">
+            <D t="Status" v={asset.disposal.status} />
+            <D t="Method" v={asset.disposal.method} />
+            <D t="Reason" v={asset.disposal.reason} />
+            <D t="Proposed date" v={fmt(asset.disposal.proposedAt)} />
+            <D t="Approved date" v={fmt(asset.disposal.approvedAt)} />
+            <D t="Completed date" v={fmt(asset.disposal.completedAt)} />
+            <D
+              t="Proposed value"
+              v={
+                asset.disposal.proposedValue == null
+                  ? null
+                  : `₹${Number(asset.disposal.proposedValue).toLocaleString("en-IN")}`
+              }
+            />
+            <D
+              t="Realized value"
+              v={
+                asset.disposal.realizedValue == null
+                  ? null
+                  : `₹${Number(asset.disposal.realizedValue).toLocaleString("en-IN")}`
+              }
+            />
+          </dl>
+        ) : (
+          <p className="empty">No disposal record.</p>
+        )}
       </section>
       <section className="card section noPrint">
         <h3>Custody history</h3>
@@ -254,7 +452,7 @@ export default function AssetDetail() {
             </tr>
           </thead>
           <tbody>
-            {asset.assignments.map((a: any) => (
+            {filteredHistory[4].map((a: any) => (
               <tr key={a.id}>
                 <td>
                   {a.user.name}
@@ -270,10 +468,10 @@ export default function AssetDetail() {
                 <td>{a.remarks || "—"}</td>
               </tr>
             ))}
-            {!asset.assignments.length && (
+            {!filteredHistory[4].length && (
               <tr>
                 <td colSpan={4} className="empty">
-                  No custody assignments recorded.
+                  No custody assignments match the history filter.
                 </td>
               </tr>
             )}

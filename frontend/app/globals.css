@@ -109,7 +109,9 @@ a {
   margin-top: 10px;
 }
 .metricCard {
-  transition: border-color 0.15s, transform 0.15s;
+  transition:
+    border-color 0.15s,
+    transform 0.15s;
 }
 .metricCard span {
   display: block;
@@ -195,6 +197,30 @@ a {
   color: white;
   border-radius: 9px;
   min-width: 260px;
+}
+.filterBar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0;
+}
+.filterBar .search {
+  flex: 1 1 260px;
+}
+.filterSelect {
+  min-width: 180px;
+  padding: 10px 12px;
+  background: #081522;
+  border: 1px solid #2a3b52;
+  color: white;
+  border-radius: 9px;
+}
+.filterCount {
+  margin-left: auto;
+  color: #8293aa;
+  font-size: 13px;
+  white-space: nowrap;
 }
 @media (max-width: 900px) {
   .shell {
@@ -282,5 +308,12 @@ a {
   }
   .search {
     min-width: 100%;
+  }
+  .filterSelect {
+    flex: 1 1 100%;
+  }
+  .filterCount {
+    margin-left: 0;
+    width: 100%;
   }
 }

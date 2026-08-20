@@ -1,14 +1,578 @@
-'use client';
-import {useEffect,useState} from 'react';import {api} from '../../lib/api';import {Shell} from '../_components';
-export default function Maintenance(){const [tab,setTab]=useState('work'),[records,setRecords]=useState<any[]>([]),[contracts,setContracts]=useState<any[]>([]),[compliance,setCompliance]=useState<any[]>([]),[disposals,setDisposals]=useState<any[]>([]),[options,setOptions]=useState<any>({assets:[],contracts:[]}),[form,setForm]=useState(false),[error,setError]=useState('');async function load(){try{const [r,a,c,d,o]=await Promise.all([api('/maintenance/records'),api('/maintenance/contracts'),api('/maintenance/compliance'),api('/maintenance/disposals'),api('/maintenance/options')]);setRecords(r);setContracts(a);setCompliance(c);setDisposals(d);setOptions(o)}catch(e:any){setError(e.message)}}useEffect(()=>{load()},[]);async function save(path:string,body:any,method='POST'){try{await api(path,{method,body:JSON.stringify(body)});setForm(false);await load()}catch(e:any){setError(e.message)}}return <Shell title="Maintenance & Compliance"><div className="tabs">{[['work','Maintenance'],['compliance','Compliance'],['amc','AMC Contracts'],['disposal','Disposal']].map(([k,v])=><button key={k} className={tab===k?'active':''} onClick={()=>{setTab(k);setForm(false)}}>{v}</button>)}</div>{error&&<p className="error">{error}</p>}<Head title={tab==='work'?'Maintenance work orders':tab==='compliance'?'Warranty, insurance & calibration':tab==='amc'?'Annual maintenance contracts':'Asset disposal workflow'} add={()=>setForm(true)}/>{form&&tab==='work'&&<WorkForm options={options} save={(b:any)=>save('/maintenance/records',b)} close={()=>setForm(false)}/>} {form&&tab==='compliance'&&<ComplianceForm assets={options.assets} save={(b:any)=>save('/maintenance/compliance',b)} close={()=>setForm(false)}/>} {form&&tab==='amc'&&<AmcForm save={(b:any)=>save('/maintenance/contracts',b)} close={()=>setForm(false)}/>} {form&&tab==='disposal'&&<DisposalForm assets={options.assets} save={(b:any)=>save('/maintenance/disposals',b)} close={()=>setForm(false)}/>} {tab==='work'&&<WorkTable rows={records} save={save}/>} {tab==='compliance'&&<ComplianceTable rows={compliance}/>} {tab==='amc'&&<AmcTable rows={contracts}/>} {tab==='disposal'&&<DisposalTable rows={disposals} save={save}/>}</Shell>}
-function Head({title,add}:any){return <div className="sectionHead section"><h3>{title}</h3><button className="btn" onClick={add}>+ Create</button></div>}
-function WorkForm({options,save,close}:any){const [f,set]=useState<any>({assetId:'',ticketNumber:'MT-'+Date.now(),type:'BREAKDOWN',description:'',priority:'MEDIUM',vendorName:'',cost:'',startedAt:new Date().toISOString().slice(0,10),completedAt:'',nextDueDate:'',amcContractId:'',status:'OPEN'});return <Form submit={()=>save(f)} close={close}><Pick l="Asset" n="assetId" f={f} set={set} rows={options.assets} label={(x:any)=>`${x.assetTag} · ${x.product.name}`}/><Input l="Ticket number" n="ticketNumber" f={f} set={set}/><Input l="Maintenance type" n="type" f={f} set={set}/><Input l="Description" n="description" f={f} set={set}/><Pick l="Priority" n="priority" f={f} set={set} rows={['LOW','MEDIUM','HIGH','CRITICAL']}/><Input l="Service vendor" n="vendorName" f={f} set={set} optional/><Input l="Cost" n="cost" type="number" f={f} set={set} optional/><Input l="Started" n="startedAt" type="date" f={f} set={set}/><Input l="Next due" n="nextDueDate" type="date" f={f} set={set} optional/><Pick l="AMC contract" n="amcContractId" f={f} set={set} rows={options.contracts} label={(x:any)=>x.contractNumber} optional/></Form>}
-function ComplianceForm({assets,save,close}:any){const [f,set]=useState<any>({assetId:'',type:'CALIBRATION',referenceNumber:'',providerName:'',startDate:'',dueDate:'',completedDate:'',notes:''});return <Form submit={()=>save(f)} close={close}><Pick l="Asset" n="assetId" f={f} set={set} rows={assets} label={(x:any)=>x.assetTag}/><Pick l="Type" n="type" f={f} set={set} rows={['WARRANTY','INSURANCE','CALIBRATION','LICENSE','CERTIFICATION']}/><Input l="Reference number" n="referenceNumber" f={f} set={set} optional/><Input l="Provider" n="providerName" f={f} set={set} optional/><Input l="Start date" n="startDate" type="date" f={f} set={set} optional/><Input l="Due date" n="dueDate" type="date" f={f} set={set}/><Input l="Notes" n="notes" f={f} set={set} optional/></Form>}
-function AmcForm({save,close}:any){const [f,set]=useState<any>({contractNumber:'AMC-'+new Date().getFullYear()+'-',providerName:'',startDate:'',endDate:'',amount:'',scope:''});return <Form submit={()=>save(f)} close={close}><Input l="Contract number" n="contractNumber" f={f} set={set}/><Input l="Provider" n="providerName" f={f} set={set}/><Input l="Start date" n="startDate" type="date" f={f} set={set}/><Input l="End date" n="endDate" type="date" f={f} set={set}/><Input l="Amount" n="amount" type="number" f={f} set={set} optional/><Input l="Scope" n="scope" f={f} set={set} optional/></Form>}
-function DisposalForm({assets,save,close}:any){const [f,set]=useState<any>({assetId:'',method:'SCRAP',reason:'',proposedValue:''});return <Form submit={()=>save(f)} close={close}><Pick l="Asset" n="assetId" f={f} set={set} rows={assets} label={(x:any)=>`${x.assetTag} · ${x.product.name}`}/><Pick l="Method" n="method" f={f} set={set} rows={['SCRAP','AUCTION','WRITE_OFF','DONATION','TRADE_IN']}/><Input l="Reason" n="reason" f={f} set={set}/><Input l="Proposed value" n="proposedValue" type="number" f={f} set={set} optional/></Form>}
-function Form({children,submit,close}:any){return <form className="card section workflowForm" onSubmit={e=>{e.preventDefault();submit()}}>{children}<div className="formActions"><button type="button" className="ghost" onClick={close}>Cancel</button><button className="btn">Save</button></div></form>}function Input({l,n,f,set,type='text',optional=false}:any){return <label>{l}<input required={!optional} type={type} min={type==='number'?0:undefined} step={type==='number'?'0.01':undefined} className="input" value={f[n]} onChange={e=>set({...f,[n]:e.target.value})}/></label>}function Pick({l,n,f,set,rows,label,optional=false}:any){return <label>{l}<select required={!optional} className="input" value={f[n]} onChange={e=>set({...f,[n]:e.target.value})}><option value="">Select…</option>{rows.map((x:any)=><option key={x.id||x} value={x.id||x}>{label?label(x):x}</option>)}</select></label>}
-function WorkTable({rows,save}:any){return <Table heads={['Ticket','Asset','Type','Priority','Started','Next due','Cost','Status','Action']}>{rows.map((r:any)=><tr key={r.id}><td>{r.ticketNumber||'—'}</td><td>{r.asset.assetTag}<br/><span className="muted">{r.asset.product.name}</span></td><td>{r.type}</td><td>{r.priority}</td><td>{date(r.startedAt)}</td><td className={due(r.nextDueDate)?'due':''}>{date(r.nextDueDate)}</td><td>{r.cost?`₹${Number(r.cost).toLocaleString('en-IN')}`:'—'}</td><td><span className="badge">{r.status}</span></td><td>{r.status!=='COMPLETED'&&<button className="btn" onClick={()=>save('/maintenance/records/'+r.id,{...r,assetId:r.assetId,startedAt:r.startedAt,status:'COMPLETED',completedAt:new Date().toISOString()},'PUT')}>Complete</button>}</td></tr>)}</Table>}
-function ComplianceTable({rows}:any){return <Table heads={['Asset','Type','Reference','Provider','Due date','State']}>{rows.map((r:any)=><tr key={r.id}><td>{r.asset.assetTag}</td><td>{r.type}</td><td>{r.referenceNumber||'—'}</td><td>{r.providerName||'—'}</td><td className={due(r.dueDate)&&!r.completedDate?'due':''}>{date(r.dueDate)}</td><td><span className="badge">{r.completedDate?'COMPLETED':due(r.dueDate)?'OVERDUE':'ACTIVE'}</span></td></tr>)}</Table>}
-function AmcTable({rows}:any){return <Table heads={['Contract','Provider','Start','End','Amount','State']}>{rows.map((r:any)=><tr key={r.id}><td>{r.contractNumber}</td><td>{r.providerName}</td><td>{date(r.startDate)}</td><td className={due(r.endDate)?'due':''}>{date(r.endDate)}</td><td>{r.amount?`₹${Number(r.amount).toLocaleString('en-IN')}`:'—'}</td><td><span className="badge">{due(r.endDate)?'EXPIRED':'ACTIVE'}</span></td></tr>)}</Table>}
-function DisposalTable({rows,save}:any){return <Table heads={['Asset','Method','Reason','Proposed','Realized','Status','Workflow']}>{rows.map((r:any)=><tr key={r.id}><td>{r.asset.assetTag}</td><td>{r.method}</td><td>{r.reason}</td><td>{r.proposedValue||'—'}</td><td>{r.realizedValue||'—'}</td><td><span className="badge">{r.status}</span></td><td><div className="rowActions">{r.status==='PROPOSED'&&<><button onClick={()=>save(`/maintenance/disposals/${r.id}/decision`,{decision:'APPROVED'})}>Approve</button><button className="danger" onClick={()=>save(`/maintenance/disposals/${r.id}/decision`,{decision:'REJECTED'})}>Reject</button></>}{r.status==='APPROVED'&&<button onClick={()=>save(`/maintenance/disposals/${r.id}/complete`,{realizedValue:Number(prompt('Realized value','0'))})}>Complete disposal</button>}</div></td></tr>)}</Table>}
-function Table({heads,children}:any){return <div className="card tableWrap"><table className="table"><thead><tr>{heads.map((h:string)=><th key={h}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>}function date(v:any){return v?new Date(v).toLocaleDateString():'—'}function due(v:any){return v&&new Date(v)<new Date()}
+"use client";
+import { useEffect, useState } from "react";
+import { api } from "../../lib/api";
+import { Shell } from "../_components";
+import { FilterBar, filterRows, unique } from "../_filters";
+export default function Maintenance() {
+  const [tab, setTab] = useState("work"),
+    [records, setRecords] = useState<any[]>([]),
+    [contracts, setContracts] = useState<any[]>([]),
+    [compliance, setCompliance] = useState<any[]>([]),
+    [disposals, setDisposals] = useState<any[]>([]),
+    [options, setOptions] = useState<any>({ assets: [], contracts: [] }),
+    [form, setForm] = useState(false),
+    [error, setError] = useState(""),
+    [query, setQuery] = useState(""),
+    [status, setStatus] = useState("");
+  const activeRows =
+    tab === "work"
+      ? records
+      : tab === "compliance"
+        ? compliance
+        : tab === "amc"
+          ? contracts
+          : disposals;
+  const statusOf = (row: any) =>
+    tab === "compliance"
+      ? row.completedDate
+        ? "COMPLETED"
+        : due(row.dueDate)
+          ? "OVERDUE"
+          : "ACTIVE"
+      : tab === "amc"
+        ? due(row.endDate)
+          ? "EXPIRED"
+          : "ACTIVE"
+        : row.status;
+  const filteredRows = filterRows(activeRows, query, status, statusOf);
+  async function load() {
+    try {
+      const [r, a, c, d, o] = await Promise.all([
+        api("/maintenance/records"),
+        api("/maintenance/contracts"),
+        api("/maintenance/compliance"),
+        api("/maintenance/disposals"),
+        api("/maintenance/options"),
+      ]);
+      setRecords(r);
+      setContracts(a);
+      setCompliance(c);
+      setDisposals(d);
+      setOptions(o);
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }
+  useEffect(() => {
+    load();
+  }, []);
+  async function save(path: string, body: any, method = "POST") {
+    try {
+      await api(path, { method, body: JSON.stringify(body) });
+      setForm(false);
+      await load();
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }
+  return (
+    <Shell title="Maintenance & Compliance">
+      <div className="tabs">
+        {[
+          ["work", "Maintenance"],
+          ["compliance", "Compliance"],
+          ["amc", "AMC Contracts"],
+          ["disposal", "Disposal"],
+        ].map(([k, v]) => (
+          <button
+            key={k}
+            className={tab === k ? "active" : ""}
+            onClick={() => {
+              setTab(k);
+              setForm(false);
+              setQuery("");
+              setStatus("");
+            }}
+          >
+            {v}
+          </button>
+        ))}
+      </div>
+      {error && <p className="error">{error}</p>}
+      <Head
+        title={
+          tab === "work"
+            ? "Maintenance work orders"
+            : tab === "compliance"
+              ? "Warranty, insurance & calibration"
+              : tab === "amc"
+                ? "Annual maintenance contracts"
+                : "Asset disposal workflow"
+        }
+        add={() => setForm(true)}
+      />
+      <FilterBar
+        query={query}
+        setQuery={setQuery}
+        status={status}
+        setStatus={setStatus}
+        statuses={unique(activeRows.map(statusOf))}
+        count={filteredRows.length}
+        total={activeRows.length}
+      />
+      {form && tab === "work" && (
+        <WorkForm
+          options={options}
+          save={(b: any) => save("/maintenance/records", b)}
+          close={() => setForm(false)}
+        />
+      )}{" "}
+      {form && tab === "compliance" && (
+        <ComplianceForm
+          assets={options.assets}
+          save={(b: any) => save("/maintenance/compliance", b)}
+          close={() => setForm(false)}
+        />
+      )}{" "}
+      {form && tab === "amc" && (
+        <AmcForm
+          save={(b: any) => save("/maintenance/contracts", b)}
+          close={() => setForm(false)}
+        />
+      )}{" "}
+      {form && tab === "disposal" && (
+        <DisposalForm
+          assets={options.assets}
+          save={(b: any) => save("/maintenance/disposals", b)}
+          close={() => setForm(false)}
+        />
+      )}{" "}
+      {tab === "work" && <WorkTable rows={filteredRows} save={save} />}{" "}
+      {tab === "compliance" && <ComplianceTable rows={filteredRows} />}{" "}
+      {tab === "amc" && <AmcTable rows={filteredRows} />}{" "}
+      {tab === "disposal" && <DisposalTable rows={filteredRows} save={save} />}
+    </Shell>
+  );
+}
+function Head({ title, add }: any) {
+  return (
+    <div className="sectionHead section">
+      <h3>{title}</h3>
+      <button className="btn" onClick={add}>
+        + Create
+      </button>
+    </div>
+  );
+}
+function WorkForm({ options, save, close }: any) {
+  const [f, set] = useState<any>({
+    assetId: "",
+    ticketNumber: "MT-" + Date.now(),
+    type: "BREAKDOWN",
+    description: "",
+    priority: "MEDIUM",
+    vendorName: "",
+    cost: "",
+    startedAt: new Date().toISOString().slice(0, 10),
+    completedAt: "",
+    nextDueDate: "",
+    amcContractId: "",
+    status: "OPEN",
+  });
+  return (
+    <Form submit={() => save(f)} close={close}>
+      <Pick
+        l="Asset"
+        n="assetId"
+        f={f}
+        set={set}
+        rows={options.assets}
+        label={(x: any) => `${x.assetTag} · ${x.product.name}`}
+      />
+      <Input l="Ticket number" n="ticketNumber" f={f} set={set} />
+      <Input l="Maintenance type" n="type" f={f} set={set} />
+      <Input l="Description" n="description" f={f} set={set} />
+      <Pick
+        l="Priority"
+        n="priority"
+        f={f}
+        set={set}
+        rows={["LOW", "MEDIUM", "HIGH", "CRITICAL"]}
+      />
+      <Input l="Service vendor" n="vendorName" f={f} set={set} optional />
+      <Input l="Cost" n="cost" type="number" f={f} set={set} optional />
+      <Input l="Started" n="startedAt" type="date" f={f} set={set} />
+      <Input
+        l="Next due"
+        n="nextDueDate"
+        type="date"
+        f={f}
+        set={set}
+        optional
+      />
+      <Pick
+        l="AMC contract"
+        n="amcContractId"
+        f={f}
+        set={set}
+        rows={options.contracts}
+        label={(x: any) => x.contractNumber}
+        optional
+      />
+    </Form>
+  );
+}
+function ComplianceForm({ assets, save, close }: any) {
+  const [f, set] = useState<any>({
+    assetId: "",
+    type: "CALIBRATION",
+    referenceNumber: "",
+    providerName: "",
+    startDate: "",
+    dueDate: "",
+    completedDate: "",
+    notes: "",
+  });
+  return (
+    <Form submit={() => save(f)} close={close}>
+      <Pick
+        l="Asset"
+        n="assetId"
+        f={f}
+        set={set}
+        rows={assets}
+        label={(x: any) => x.assetTag}
+      />
+      <Pick
+        l="Type"
+        n="type"
+        f={f}
+        set={set}
+        rows={[
+          "WARRANTY",
+          "INSURANCE",
+          "CALIBRATION",
+          "LICENSE",
+          "CERTIFICATION",
+        ]}
+      />
+      <Input
+        l="Reference number"
+        n="referenceNumber"
+        f={f}
+        set={set}
+        optional
+      />
+      <Input l="Provider" n="providerName" f={f} set={set} optional />
+      <Input
+        l="Start date"
+        n="startDate"
+        type="date"
+        f={f}
+        set={set}
+        optional
+      />
+      <Input l="Due date" n="dueDate" type="date" f={f} set={set} />
+      <Input l="Notes" n="notes" f={f} set={set} optional />
+    </Form>
+  );
+}
+function AmcForm({ save, close }: any) {
+  const [f, set] = useState<any>({
+    contractNumber: "AMC-" + new Date().getFullYear() + "-",
+    providerName: "",
+    startDate: "",
+    endDate: "",
+    amount: "",
+    scope: "",
+  });
+  return (
+    <Form submit={() => save(f)} close={close}>
+      <Input l="Contract number" n="contractNumber" f={f} set={set} />
+      <Input l="Provider" n="providerName" f={f} set={set} />
+      <Input l="Start date" n="startDate" type="date" f={f} set={set} />
+      <Input l="End date" n="endDate" type="date" f={f} set={set} />
+      <Input l="Amount" n="amount" type="number" f={f} set={set} optional />
+      <Input l="Scope" n="scope" f={f} set={set} optional />
+    </Form>
+  );
+}
+function DisposalForm({ assets, save, close }: any) {
+  const [f, set] = useState<any>({
+    assetId: "",
+    method: "SCRAP",
+    reason: "",
+    proposedValue: "",
+  });
+  return (
+    <Form submit={() => save(f)} close={close}>
+      <Pick
+        l="Asset"
+        n="assetId"
+        f={f}
+        set={set}
+        rows={assets}
+        label={(x: any) => `${x.assetTag} · ${x.product.name}`}
+      />
+      <Pick
+        l="Method"
+        n="method"
+        f={f}
+        set={set}
+        rows={["SCRAP", "AUCTION", "WRITE_OFF", "DONATION", "TRADE_IN"]}
+      />
+      <Input l="Reason" n="reason" f={f} set={set} />
+      <Input
+        l="Proposed value"
+        n="proposedValue"
+        type="number"
+        f={f}
+        set={set}
+        optional
+      />
+    </Form>
+  );
+}
+function Form({ children, submit, close }: any) {
+  return (
+    <form
+      className="card section workflowForm"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+    >
+      {children}
+      <div className="formActions">
+        <button type="button" className="ghost" onClick={close}>
+          Cancel
+        </button>
+        <button className="btn">Save</button>
+      </div>
+    </form>
+  );
+}
+function Input({ l, n, f, set, type = "text", optional = false }: any) {
+  return (
+    <label>
+      {l}
+      <input
+        required={!optional}
+        type={type}
+        min={type === "number" ? 0 : undefined}
+        step={type === "number" ? "0.01" : undefined}
+        className="input"
+        value={f[n]}
+        onChange={(e) => set({ ...f, [n]: e.target.value })}
+      />
+    </label>
+  );
+}
+function Pick({ l, n, f, set, rows, label, optional = false }: any) {
+  return (
+    <label>
+      {l}
+      <select
+        required={!optional}
+        className="input"
+        value={f[n]}
+        onChange={(e) => set({ ...f, [n]: e.target.value })}
+      >
+        <option value="">Select…</option>
+        {rows.map((x: any) => (
+          <option key={x.id || x} value={x.id || x}>
+            {label ? label(x) : x}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+function WorkTable({ rows, save }: any) {
+  return (
+    <Table
+      heads={[
+        "Ticket",
+        "Asset",
+        "Type",
+        "Priority",
+        "Started",
+        "Next due",
+        "Cost",
+        "Status",
+        "Action",
+      ]}
+    >
+      {rows.map((r: any) => (
+        <tr key={r.id}>
+          <td>{r.ticketNumber || "—"}</td>
+          <td>
+            {r.asset.assetTag}
+            <br />
+            <span className="muted">{r.asset.product.name}</span>
+          </td>
+          <td>{r.type}</td>
+          <td>{r.priority}</td>
+          <td>{date(r.startedAt)}</td>
+          <td className={due(r.nextDueDate) ? "due" : ""}>
+            {date(r.nextDueDate)}
+          </td>
+          <td>{r.cost ? `₹${Number(r.cost).toLocaleString("en-IN")}` : "—"}</td>
+          <td>
+            <span className="badge">{r.status}</span>
+          </td>
+          <td>
+            {r.status !== "COMPLETED" && (
+              <button
+                className="btn"
+                onClick={() =>
+                  save(
+                    "/maintenance/records/" + r.id,
+                    {
+                      ...r,
+                      assetId: r.assetId,
+                      startedAt: r.startedAt,
+                      status: "COMPLETED",
+                      completedAt: new Date().toISOString(),
+                    },
+                    "PUT",
+                  )
+                }
+              >
+                Complete
+              </button>
+            )}
+          </td>
+        </tr>
+      ))}
+    </Table>
+  );
+}
+function ComplianceTable({ rows }: any) {
+  return (
+    <Table
+      heads={["Asset", "Type", "Reference", "Provider", "Due date", "State"]}
+    >
+      {rows.map((r: any) => (
+        <tr key={r.id}>
+          <td>{r.asset.assetTag}</td>
+          <td>{r.type}</td>
+          <td>{r.referenceNumber || "—"}</td>
+          <td>{r.providerName || "—"}</td>
+          <td className={due(r.dueDate) && !r.completedDate ? "due" : ""}>
+            {date(r.dueDate)}
+          </td>
+          <td>
+            <span className="badge">
+              {r.completedDate
+                ? "COMPLETED"
+                : due(r.dueDate)
+                  ? "OVERDUE"
+                  : "ACTIVE"}
+            </span>
+          </td>
+        </tr>
+      ))}
+    </Table>
+  );
+}
+function AmcTable({ rows }: any) {
+  return (
+    <Table heads={["Contract", "Provider", "Start", "End", "Amount", "State"]}>
+      {rows.map((r: any) => (
+        <tr key={r.id}>
+          <td>{r.contractNumber}</td>
+          <td>{r.providerName}</td>
+          <td>{date(r.startDate)}</td>
+          <td className={due(r.endDate) ? "due" : ""}>{date(r.endDate)}</td>
+          <td>
+            {r.amount ? `₹${Number(r.amount).toLocaleString("en-IN")}` : "—"}
+          </td>
+          <td>
+            <span className="badge">
+              {due(r.endDate) ? "EXPIRED" : "ACTIVE"}
+            </span>
+          </td>
+        </tr>
+      ))}
+    </Table>
+  );
+}
+function DisposalTable({ rows, save }: any) {
+  return (
+    <Table
+      heads={[
+        "Asset",
+        "Method",
+        "Reason",
+        "Proposed",
+        "Realized",
+        "Status",
+        "Workflow",
+      ]}
+    >
+      {rows.map((r: any) => (
+        <tr key={r.id}>
+          <td>{r.asset.assetTag}</td>
+          <td>{r.method}</td>
+          <td>{r.reason}</td>
+          <td>{r.proposedValue || "—"}</td>
+          <td>{r.realizedValue || "—"}</td>
+          <td>
+            <span className="badge">{r.status}</span>
+          </td>
+          <td>
+            <div className="rowActions">
+              {r.status === "PROPOSED" && (
+                <>
+                  <button
+                    onClick={() =>
+                      save(`/maintenance/disposals/${r.id}/decision`, {
+                        decision: "APPROVED",
+                      })
+                    }
+                  >
+                    Approve
+                  </button>
+                  <button
+                    className="danger"
+                    onClick={() =>
+                      save(`/maintenance/disposals/${r.id}/decision`, {
+                        decision: "REJECTED",
+                      })
+                    }
+                  >
+                    Reject
+                  </button>
+                </>
+              )}
+              {r.status === "APPROVED" && (
+                <button
+                  onClick={() =>
+                    save(`/maintenance/disposals/${r.id}/complete`, {
+                      realizedValue: Number(prompt("Realized value", "0")),
+                    })
+                  }
+                >
+                  Complete disposal
+                </button>
+              )}
+            </div>
+          </td>
+        </tr>
+      ))}
+    </Table>
+  );
+}
+function Table({ heads, children }: any) {
+  return (
+    <div className="card tableWrap">
+      <table className="table">
+        <thead>
+          <tr>
+            {heads.map((h: string) => (
+              <th key={h}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{children}</tbody>
+      </table>
+    </div>
+  );
+}
+function date(v: any) {
+  return v ? new Date(v).toLocaleDateString() : "—";
+}
+function due(v: any) {
+  return v && new Date(v) < new Date();
+}

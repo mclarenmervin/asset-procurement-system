@@ -3,12 +3,21 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "../../lib/api";
 import { Shell } from "../_components";
+import { FilterBar, filterRows, unique } from "../_filters";
 export default function Verification() {
   const [sessions, setSessions] = useState<any[]>([]),
     [locations, setLocations] = useState<any[]>([]),
     [selected, setSelected] = useState<any>(null),
     [form, setForm] = useState(false),
+    [query, setQuery] = useState(""),
+    [status, setStatus] = useState(""),
     [error, setError] = useState("");
+  const filteredSessions = filterRows(
+    sessions,
+    query,
+    status,
+    (row: any) => row.status,
+  );
   async function load(id?: string) {
     try {
       const [s, l] = await Promise.all([
@@ -69,8 +78,17 @@ export default function Verification() {
               close={() => setForm(false)}
             />
           )}
+          <FilterBar
+            query={query}
+            setQuery={setQuery}
+            status={status}
+            setStatus={setStatus}
+            statuses={unique(sessions.map((row) => row.status))}
+            count={filteredSessions.length}
+            total={sessions.length}
+          />
           <div className="sessionGrid">
-            {sessions.map((s) => (
+            {filteredSessions.map((s) => (
               <section className="card" key={s.id}>
                 <div className="sectionHead">
                   <span className="badge">{s.status}</span>
@@ -180,7 +198,15 @@ function Session({ session, locations, back, act }: any) {
     [notes, setNotes] = useState(""),
     [coords, setCoords] = useState<any>({}),
     [camera, setCamera] = useState(false),
-    [last, setLast] = useState<any>(null);
+    [last, setLast] = useState<any>(null),
+    [query, setQuery] = useState(""),
+    [status, setStatus] = useState("");
+  const filteredRecords = filterRows(
+    session.records,
+    query,
+    status,
+    (row: any) => row.result,
+  );
   async function scan(e?: React.FormEvent) {
     e?.preventDefault();
     if (!code) return;
@@ -343,6 +369,16 @@ function Session({ session, locations, back, act }: any) {
       )}
       <section className="card section">
         <h3>Verification records</h3>
+        <FilterBar
+          query={query}
+          setQuery={setQuery}
+          status={status}
+          setStatus={setStatus}
+          statuses={unique(session.records.map((row: any) => row.result))}
+          statusLabel="All results"
+          count={filteredRecords.length}
+          total={session.records.length}
+        />
         <div className="tableWrap">
           <table className="table">
             <thead>
@@ -356,7 +392,7 @@ function Session({ session, locations, back, act }: any) {
               </tr>
             </thead>
             <tbody>
-              {session.records.map((r: any) => (
+              {filteredRecords.map((r: any) => (
                 <tr key={r.id}>
                   <td>
                     <Link className="tableLink" href={`/assets/${r.asset.id}`}>
