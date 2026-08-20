@@ -56,6 +56,27 @@
   font-size: 11px;
   font-weight: 700;
 }
+.assetToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.fileInput {
+  display: none;
+}
+.importErrors {
+  margin: 14px 0;
+  padding: 16px 18px;
+  border-color: #6c3841;
+  color: #ffb0bb;
+}
+.importErrors ul {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  max-height: 240px;
+  overflow: auto;
+}
 .detailGrid {
   display: grid;
   grid-template-columns: 1fr 330px;
@@ -109,6 +130,14 @@
   color: #a7b5c8;
 }
 @media (max-width: 900px) {
+  .sectionHead,
+  .assetToolbar {
+    align-items: stretch;
+  }
+  .assetToolbar .btn,
+  .assetToolbar .ghost {
+    flex: 1 1 140px;
+  }
   .detailGrid {
     grid-template-columns: 1fr;
   }

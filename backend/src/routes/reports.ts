@@ -182,6 +182,7 @@ reportsRouter.get("/export/:type", async (req: AuthRequest, res) => {
         department: true,
         currentLocation: true,
         custodian: true,
+        purchaseOrder: true,
       },
       orderBy: { assetTag: "asc" },
     });
@@ -199,10 +200,13 @@ reportsRouter.get("/export/:type", async (req: AuthRequest, res) => {
         "Department",
         "Location",
         "Custodian",
+        "Purchase Order",
         "Purchase Price",
         "Purchase Date",
+        "Commissioning Date",
         "Warranty End",
         "Expiry",
+        "Notes",
       ],
       rows.map((a) => [
         a.assetTag,
@@ -214,11 +218,14 @@ reportsRouter.get("/export/:type", async (req: AuthRequest, res) => {
         a.vendor?.name,
         a.department?.name,
         a.currentLocation?.name,
-        a.custodian?.name,
+        a.custodian?.email,
+        a.purchaseOrder?.poNumber,
         a.purchasePrice,
         a.purchaseDate,
+        a.commissioningDate,
         a.warrantyEndDate,
         a.expiryDate,
+        a.notes,
       ]),
     );
   }

@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { api } from "../../lib/api";
+import { api, download } from "../../lib/api";
 import { Shell } from "../_components";
 import { FilterBar, filterRows, unique } from "../_filters";
+import { downloadAssetTemplate, parseAssetCsv } from "./csv";
 const blank: any = {
   assetTag: "",
   serialNumber: "",
@@ -33,7 +34,10 @@ export default function Assets() {
     [editing, setEditing] = useState<any>(null),
     [open, setOpen] = useState(false),
     [error, setError] = useState(""),
+    [importErrors, setImportErrors] = useState<any[]>([]),
+    [importing, setImporting] = useState(false),
     [busy, setBusy] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
   async function load() {
     try {
       const [assets, opts] = await Promise.all([
@@ -100,6 +104,31 @@ export default function Assets() {
       setError(e.message);
     }
   }
+  async function importCsv(file?: File) {
+    if (!file) return;
+    setImporting(true);
+    setError("");
+    setImportErrors([]);
+    try {
+      const rows = parseAssetCsv(await file.text());
+      if (!rows.length)
+        throw new Error("The CSV does not contain any asset rows");
+      const result = await api("/assets/import", {
+        method: "POST",
+        body: JSON.stringify({ rows }),
+      });
+      await load();
+      alert(
+        `${result.imported} asset${result.imported === 1 ? "" : "s"} imported successfully.`,
+      );
+    } catch (e: any) {
+      setError(e.message || "Asset import failed");
+      setImportErrors(e.errors || []);
+    } finally {
+      setImporting(false);
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  }
   const opts = (name: string, label = (x: any) => x.name) =>
     (options?.[name] || []).map((x: any) => (
       <option key={x.id} value={x.id}>
@@ -113,9 +142,36 @@ export default function Assets() {
     <Shell title="Asset Registry">
       <div className="sectionHead">
         <div />
-        <button className="btn" onClick={() => edit()}>
-          + Add asset
-        </button>
+        <div className="assetToolbar">
+          <button className="ghost" onClick={downloadAssetTemplate}>
+            CSV template
+          </button>
+          <button
+            className="ghost"
+            onClick={() =>
+              download("/reports/export/assets", "asset-register.csv")
+            }
+          >
+            Export CSV
+          </button>
+          <button
+            className="ghost"
+            disabled={importing}
+            onClick={() => fileInput.current?.click()}
+          >
+            {importing ? "Importing…" : "Import CSV"}
+          </button>
+          <input
+            ref={fileInput}
+            className="fileInput"
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(event) => importCsv(event.target.files?.[0])}
+          />
+          <button className="btn" onClick={() => edit()}>
+            + Add asset
+          </button>
+        </div>
       </div>
       <FilterBar
         query={q}
@@ -133,6 +189,22 @@ export default function Assets() {
         total={rows.length}
       />
       {error && <p className="error">{error}</p>}
+      {!!importErrors.length && (
+        <div className="card importErrors">
+          <strong>Fix these rows and import the file again:</strong>
+          <ul>
+            {importErrors.slice(0, 20).map((item, index) => (
+              <li key={`${item.row}-${index}`}>
+                Row {item.row}
+                {item.assetTag ? ` (${item.assetTag})` : ""}: {item.message}
+              </li>
+            ))}
+          </ul>
+          {importErrors.length > 20 && (
+            <p>And {importErrors.length - 20} more errors.</p>
+          )}
+        </div>
+      )}
       {open && (
         <form className="card section assetForm" onSubmit={save}>
           <div className="sectionHead">

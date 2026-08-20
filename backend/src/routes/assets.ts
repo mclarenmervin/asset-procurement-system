@@ -161,6 +161,255 @@ const assetSchema = z.object({
   currentLocationId: optionalId,
   custodianId: optionalId,
 });
+const importRowSchema = z.object({
+  assetTag: z.string().trim().min(2),
+  serialNumber: z.string().trim().optional().default(""),
+  product: z.string().trim().min(1),
+  category: z.string().trim().min(1),
+  tags: z.string().optional().default(""),
+  status: z
+    .enum([
+      "IN_STOCK",
+      "IN_USE",
+      "UNDER_MAINTENANCE",
+      "TRANSFER_PENDING",
+      "EXPIRED",
+      "DISPOSED",
+      "LOST",
+    ])
+    .default("IN_STOCK"),
+  vendor: z.string().trim().optional().default(""),
+  department: z.string().trim().optional().default(""),
+  location: z.string().trim().optional().default(""),
+  custodian: z.string().trim().optional().default(""),
+  purchaseOrder: z.string().trim().optional().default(""),
+  purchasePrice: z.union([z.string(), z.number()]).optional().default(""),
+  purchaseDate: z.string().trim().optional().default(""),
+  commissioningDate: z.string().trim().optional().default(""),
+  warrantyEndDate: z.string().trim().optional().default(""),
+  expiryDate: z.string().trim().optional().default(""),
+  notes: z.string().max(2000).optional().default(""),
+});
+const importSchema = z.object({
+  rows: z.array(importRowSchema).min(1).max(500),
+});
+
+assetsRouter.post(
+  "/import",
+  authorize("SUPER_ADMIN", "ORG_ADMIN", "ASSET_MANAGER", "STORE_MANAGER"),
+  async (req: AuthRequest, res) => {
+    const { rows } = importSchema.parse(req.body),
+      org = req.user!.organizationId;
+    const [
+      products,
+      categories,
+      vendors,
+      departments,
+      locations,
+      users,
+      purchaseOrders,
+      existing,
+    ] = await Promise.all([
+      prisma.product.findMany({ where: { organizationId: org } }),
+      prisma.assetCategory.findMany({ where: { organizationId: org } }),
+      prisma.vendor.findMany({ where: { organizationId: org } }),
+      prisma.department.findMany({ where: { organizationId: org } }),
+      prisma.location.findMany({ where: { organizationId: org } }),
+      prisma.user.findMany({ where: { organizationId: org } }),
+      prisma.purchaseOrder.findMany({ where: { organizationId: org } }),
+      prisma.asset.findMany({
+        where: { organizationId: org },
+        select: { assetTag: true },
+      }),
+    ]);
+    const key = (value: unknown) =>
+      String(value || "")
+        .trim()
+        .toLowerCase();
+    const lookup = (items: any[], fields: string[]) => {
+      const map = new Map<string, any>();
+      for (const item of items)
+        for (const field of fields)
+          if (item[field]) map.set(key(item[field]), item);
+      return map;
+    };
+    const maps = {
+      products: lookup(products, ["sku", "name"]),
+      categories: lookup(categories, ["code", "name"]),
+      vendors: lookup(vendors, ["code", "name"]),
+      departments: lookup(departments, ["code", "name"]),
+      locations: lookup(locations, ["code", "name"]),
+      users: lookup(users, ["email"]),
+      purchaseOrders: lookup(purchaseOrders, ["poNumber"]),
+    };
+    const usedTags = new Set(existing.map((item) => key(item.assetTag)));
+    const errors: { row: number; assetTag: string; message: string }[] = [];
+    const prepared: any[] = [];
+    const optional = (
+      map: Map<string, any>,
+      value: string,
+      label: string,
+      row: number,
+    ) => {
+      if (!value) return null;
+      const found = map.get(key(value));
+      if (!found)
+        errors.push({
+          row,
+          assetTag: rows[row - 2]?.assetTag || "",
+          message: `${label} \"${value}\" was not found`,
+        });
+      return found?.id || null;
+    };
+    rows.forEach((item, index) => {
+      const row = index + 2,
+        assetKey = key(item.assetTag),
+        product = maps.products.get(key(item.product)),
+        category = maps.categories.get(key(item.category));
+      if (usedTags.has(assetKey))
+        errors.push({
+          row,
+          assetTag: item.assetTag,
+          message: "Asset tag already exists or is duplicated in this file",
+        });
+      usedTags.add(assetKey);
+      if (!product)
+        errors.push({
+          row,
+          assetTag: item.assetTag,
+          message: `Product \"${item.product}\" was not found`,
+        });
+      if (!category)
+        errors.push({
+          row,
+          assetTag: item.assetTag,
+          message: `Category \"${item.category}\" was not found`,
+        });
+      if (product && category && product.categoryId !== category.id)
+        errors.push({
+          row,
+          assetTag: item.assetTag,
+          message: "Product does not belong to the selected category",
+        });
+      const price =
+        item.purchasePrice === "" ? null : Number(item.purchasePrice);
+      if (price !== null && (!Number.isFinite(price) || price < 0))
+        errors.push({
+          row,
+          assetTag: item.assetTag,
+          message: "Purchase price must be a non-negative number",
+        });
+      const tags = [
+        ...new Set(item.tags.split(/[;,]/).map(key).filter(Boolean)),
+      ];
+      if (tags.length > 20)
+        errors.push({
+          row,
+          assetTag: item.assetTag,
+          message: "An asset can have no more than 20 tags",
+        });
+      if (tags.some((tag) => tag.length > 40))
+        errors.push({
+          row,
+          assetTag: item.assetTag,
+          message: "Each tag must be 40 characters or fewer",
+        });
+      const parsedDates: Record<string, Date | null> = {};
+      for (const field of [
+        "purchaseDate",
+        "commissioningDate",
+        "warrantyEndDate",
+        "expiryDate",
+      ] as const) {
+        const value = item[field];
+        parsedDates[field] = value ? new Date(value) : null;
+        if (value && Number.isNaN(parsedDates[field]!.getTime()))
+          errors.push({
+            row,
+            assetTag: item.assetTag,
+            message: `${field} is not a valid date`,
+          });
+      }
+      prepared.push({
+        assetTag: item.assetTag,
+        serialNumber: item.serialNumber || null,
+        tags,
+        status: item.status,
+        productId: product?.id,
+        categoryId: category?.id,
+        vendorId: optional(maps.vendors, item.vendor, "Vendor", row),
+        departmentId: optional(
+          maps.departments,
+          item.department,
+          "Department",
+          row,
+        ),
+        currentLocationId: optional(
+          maps.locations,
+          item.location,
+          "Location",
+          row,
+        ),
+        custodianId: optional(
+          maps.users,
+          item.custodian,
+          "Custodian email",
+          row,
+        ),
+        purchaseOrderId: optional(
+          maps.purchaseOrders,
+          item.purchaseOrder,
+          "Purchase order",
+          row,
+        ),
+        purchasePrice: price,
+        ...parsedDates,
+        notes: item.notes || null,
+      });
+    });
+    if (errors.length)
+      return res
+        .status(400)
+        .json({ message: "Import validation failed", errors });
+    const created = await prisma.$transaction(async (tx) => {
+      const result = [];
+      for (const data of prepared) {
+        const asset = await tx.asset.create({
+          data: {
+            ...data,
+            organizationId: org,
+            qrValue: `ASSET:${data.assetTag}`,
+          },
+        });
+        await tx.assetMovement.create({
+          data: {
+            assetId: asset.id,
+            type: "RECEIPT",
+            toLocationId: asset.currentLocationId,
+            movedByUserId: req.user!.id,
+            remarks: "Asset imported from CSV",
+          },
+        });
+        if (asset.custodianId)
+          await tx.assetAssignment.create({
+            data: {
+              assetId: asset.id,
+              userId: asset.custodianId,
+              assignedByUserId: req.user!.id,
+              remarks: "Initial assignment from CSV import",
+            },
+          });
+        result.push(asset);
+      }
+      return result;
+    });
+    await audit(req, "IMPORT", "Asset", undefined, undefined, {
+      count: created.length,
+      assetIds: created.map((item) => item.id),
+    });
+    res.status(201).json({ imported: created.length });
+  },
+);
 assetsRouter.post(
   "/",
   authorize("SUPER_ADMIN", "ORG_ADMIN", "ASSET_MANAGER", "STORE_MANAGER"),
