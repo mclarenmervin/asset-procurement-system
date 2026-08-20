@@ -10,6 +10,10 @@ export function FilterBar({
   count,
   total,
   onClear,
+  secondary,
+  setSecondary,
+  secondaryOptions = [],
+  secondaryLabel = "All categories",
 }: {
   query: string;
   setQuery: (value: string) => void;
@@ -20,8 +24,12 @@ export function FilterBar({
   count: number;
   total: number;
   onClear?: () => void;
+  secondary?: string;
+  setSecondary?: (value: string) => void;
+  secondaryOptions?: { value: string; label: string }[];
+  secondaryLabel?: string;
 }) {
-  const active = Boolean(query || status);
+  const active = Boolean(query || status || secondary);
   return (
     <div className="filterBar" role="search">
       <input
@@ -47,6 +55,21 @@ export function FilterBar({
           ))}
         </select>
       )}
+      {setSecondary && (
+        <select
+          className="filterSelect"
+          value={secondary || ""}
+          onChange={(e) => setSecondary(e.target.value)}
+          aria-label={`Filter by ${secondaryLabel.replace(/^All /, "")}`}
+        >
+          <option value="">{secondaryLabel}</option>
+          {secondaryOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      )}
       {active && (
         <button
           className="ghost"
@@ -54,6 +77,7 @@ export function FilterBar({
           onClick={() => {
             setQuery("");
             setStatus?.("");
+            setSecondary?.("");
             onClear?.();
           }}
         >

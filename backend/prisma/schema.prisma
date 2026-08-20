@@ -477,6 +477,7 @@ model Asset {
   assetTag String
   serialNumber String?
   qrValue String @unique
+  tags String[] @default([])
   status AssetStatus @default(IN_STOCK)
   purchasePrice Decimal? @db.Decimal(14,2)
   purchaseDate DateTime?

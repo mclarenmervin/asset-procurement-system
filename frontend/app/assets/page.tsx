@@ -7,6 +7,7 @@ import { FilterBar, filterRows, unique } from "../_filters";
 const blank: any = {
   assetTag: "",
   serialNumber: "",
+  tags: "",
   status: "IN_STOCK",
   purchasePrice: "",
   purchaseDate: "",
@@ -27,6 +28,7 @@ export default function Assets() {
     [options, setOptions] = useState<any>(null),
     [q, setQ] = useState(""),
     [status, setStatus] = useState(""),
+    [category, setCategory] = useState(""),
     [form, setForm] = useState<any>(blank),
     [editing, setEditing] = useState<any>(null),
     [open, setOpen] = useState(false),
@@ -52,6 +54,7 @@ export default function Assets() {
       ? {
           ...blank,
           ...row,
+          tags: (row.tags || []).join(", "),
           purchasePrice: row.purchasePrice || "",
           purchaseDate: date(row.purchaseDate),
           commissioningDate: date(row.commissioningDate),
@@ -71,7 +74,13 @@ export default function Assets() {
     try {
       await api("/assets" + (editing ? "/" + editing.id : ""), {
         method: editing ? "PUT" : "POST",
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          tags: String(form.tags || "")
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+        }),
       });
       setOpen(false);
       await load();
@@ -97,7 +106,9 @@ export default function Assets() {
         {label(x)}
       </option>
     ));
-  const visibleRows = filterRows(rows, q, status, (row) => row.status);
+  const visibleRows = filterRows(rows, q, status, (row) => row.status).filter(
+    (row) => !category || row.categoryId === category,
+  );
   return (
     <Shell title="Asset Registry">
       <div className="sectionHead">
@@ -112,6 +123,12 @@ export default function Assets() {
         status={status}
         setStatus={setStatus}
         statuses={unique(rows.map((row) => row.status))}
+        secondary={category}
+        setSecondary={setCategory}
+        secondaryOptions={(options?.categories || []).map((item: any) => ({
+          value: item.id,
+          label: item.name,
+        }))}
         count={visibleRows.length}
         total={rows.length}
       />
@@ -139,6 +156,12 @@ export default function Assets() {
             <Field
               n="serialNumber"
               l="Serial number"
+              form={form}
+              set={setForm}
+            />
+            <Field
+              n="tags"
+              l="Tags (comma separated)"
               form={form}
               set={setForm}
             />
@@ -248,6 +271,8 @@ export default function Assets() {
             <tr>
               <th>Asset</th>
               <th>Product</th>
+              <th>Category</th>
+              <th>Tags</th>
               <th>Department</th>
               <th>Location</th>
               <th>Custodian</th>
@@ -269,6 +294,17 @@ export default function Assets() {
                   <Link className="assetNameLink" href={"/assets/" + a.id}>
                     {a.product.name}
                   </Link>
+                </td>
+                <td>{a.category?.name || "—"}</td>
+                <td>
+                  <div className="tagList">
+                    {a.tags?.map((tag: string) => (
+                      <span className="tagChip" key={tag}>
+                        {tag}
+                      </span>
+                    ))}
+                    {!a.tags?.length && <span className="muted">—</span>}
+                  </div>
                 </td>
                 <td>{a.department?.name || "—"}</td>
                 <td>{a.currentLocation?.name || "—"}</td>
@@ -296,7 +332,7 @@ export default function Assets() {
             ))}
             {!visibleRows.length && (
               <tr>
-                <td colSpan={7} className="empty">
+                <td colSpan={9} className="empty">
                   {rows.length
                     ? "No assets match the current filters."
                     : "No assets registered."}

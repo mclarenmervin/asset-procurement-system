@@ -5,7 +5,7 @@ AssetFlow Enterprise is a full-stack asset, procurement and material-management 
 ## What is included
 
 - Organization, department, hierarchical location, vendor, category and product masters
-- Serialized asset registry, custodians, append-only movement history and printable URL QR labels that open the complete authorized asset record
+- Serialized asset registry with categories and flexible tags, custodians, append-only movement history and printable URL QR labels that open the complete authorized asset record
 - Purchase requests, RFQs, vendor quotations, purchase orders and sequential approvals
 - Warehouses, storage bins, GRN inspection, batches, stock ledger, issue and return
 - Maintenance jobs, AMC contracts, compliance records and asset disposal

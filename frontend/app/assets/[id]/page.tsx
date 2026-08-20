@@ -124,6 +124,19 @@ export default function AssetDetail() {
             <D t="Category" v={asset.category?.name} />
             <D t="Serial number" v={asset.serialNumber} />
             <D t="QR identifier" v={asset.qrValue} />
+            <div>
+              <dt>Tags</dt>
+              <dd>
+                <div className="tagList">
+                  {asset.tags?.map((tag: string) => (
+                    <span className="tagChip" key={tag}>
+                      {tag}
+                    </span>
+                  ))}
+                  {!asset.tags?.length && "—"}
+                </div>
+              </dd>
+            </div>
             <D t="Vendor" v={asset.vendor?.name} />
             <D t="Purchase order" v={asset.purchaseOrder?.poNumber} />
             <D
