@@ -265,7 +265,11 @@ export default function Assets() {
                   <br />
                   <span className="muted">{a.serialNumber || "No serial"}</span>
                 </td>
-                <td>{a.product.name}</td>
+                <td>
+                  <Link className="assetNameLink" href={"/assets/" + a.id}>
+                    {a.product.name}
+                  </Link>
+                </td>
                 <td>{a.department?.name || "—"}</td>
                 <td>{a.currentLocation?.name || "—"}</td>
                 <td>{a.custodian?.name || "—"}</td>
@@ -274,7 +278,14 @@ export default function Assets() {
                 </td>
                 <td>
                   <div className="rowActions">
-                    <Link href={"/assets/" + a.id}>View</Link>
+                    <Link
+                      className="viewIconButton"
+                      href={"/assets/" + a.id}
+                      aria-label={`View ${a.assetTag}`}
+                      title="View asset details"
+                    >
+                      <EyeIcon />
+                    </Link>
                     <button onClick={() => edit(a)}>Edit</button>
                     <button className="danger" onClick={() => remove(a)}>
                       Delete
@@ -331,4 +342,22 @@ function Select({ n, l, form, set, children, required = false }: any) {
 }
 function date(value: any) {
   return value ? new Date(value).toISOString().slice(0, 10) : "";
+}
+function EyeIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+      <circle cx="12" cy="12" r="2.75" />
+    </svg>
+  );
 }
