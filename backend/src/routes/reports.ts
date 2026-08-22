@@ -2,6 +2,7 @@ import { Router, Response } from "express";
 import { prisma } from "../db.js";
 import { auth, AuthRequest } from "../middleware/auth.js";
 import { permit } from "../rbac.js";
+import ExcelJS from "exceljs";
 export const reportsRouter = Router();
 reportsRouter.use(auth, permit("reports.view"));
 reportsRouter.get("/analytics", async (req: AuthRequest, res) => {
@@ -187,9 +188,10 @@ reportsRouter.get("/export/:type", async (req: AuthRequest, res) => {
       },
       orderBy: { assetTag: "asc" },
     });
-    return csv(
+    return excel(
       res,
-      "asset-register.csv",
+      "asset-register.xlsx",
+      "Asset Register",
       [
         "Asset Tag",
         "Serial",
@@ -236,9 +238,10 @@ reportsRouter.get("/export/:type", async (req: AuthRequest, res) => {
       include: { asset: true, fromLocation: true, toLocation: true },
       orderBy: { movedAt: "desc" },
     });
-    return csv(
+    return excel(
       res,
-      "asset-movements.csv",
+      "asset-movements.xlsx",
+      "Asset Movements",
       ["Asset Tag", "Type", "From", "To", "Date", "Remarks"],
       rows.map((x) => [
         x.asset.assetTag,
@@ -256,9 +259,10 @@ reportsRouter.get("/export/:type", async (req: AuthRequest, res) => {
       include: { vendor: true, items: { include: { product: true } } },
       orderBy: { poDate: "desc" },
     });
-    return csv(
+    return excel(
       res,
-      "purchase-orders.csv",
+      "purchase-orders.xlsx",
+      "Purchase Orders",
       ["PO Number", "Date", "Vendor", "Status", "Total", "Items"],
       rows.map((x) => [
         x.poNumber,
@@ -276,9 +280,10 @@ reportsRouter.get("/export/:type", async (req: AuthRequest, res) => {
       include: { product: true, warehouse: true, bin: true },
       orderBy: { updatedAt: "desc" },
     });
-    return csv(
+    return excel(
       res,
-      "stock-register.csv",
+      "stock-register.xlsx",
+      "Stock Register",
       ["SKU", "Material", "Batch", "Warehouse", "Bin", "Quantity", "Expiry"],
       rows.map((x) => [
         x.product.sku,
@@ -297,9 +302,10 @@ reportsRouter.get("/export/:type", async (req: AuthRequest, res) => {
       include: { asset: true },
       orderBy: { startedAt: "desc" },
     });
-    return csv(
+    return excel(
       res,
-      "maintenance-register.csv",
+      "maintenance-register.xlsx",
+      "Maintenance Register",
       [
         "Ticket",
         "Asset",
@@ -332,9 +338,10 @@ reportsRouter.get("/export/:type", async (req: AuthRequest, res) => {
       include: { session: true, asset: true, observedLocation: true },
       orderBy: { scannedAt: "desc" },
     });
-    return csv(
+    return excel(
       res,
-      "verification-results.csv",
+      "verification-results.xlsx",
+      "Verification Results",
       [
         "Session",
         "Asset",
@@ -359,15 +366,72 @@ reportsRouter.get("/export/:type", async (req: AuthRequest, res) => {
   }
   res.status(404).json({ message: "Unknown export type" });
 });
-function csv(res: Response, name: string, headers: string[], rows: any[][]) {
-  const escape = (v: any) => `"${String(v ?? "").replaceAll('"', '""')}"`;
-  const output = [
-    headers.map(escape).join(","),
-    ...rows.map((row) =>
-      row.map((v) => escape(v instanceof Date ? v.toISOString() : v)).join(","),
+async function excel(
+  res: Response,
+  name: string,
+  sheetName: string,
+  headers: string[],
+  rows: any[][],
+) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "AssetFlow Enterprise";
+  workbook.created = new Date();
+  const sheet = workbook.addWorksheet(sheetName, {
+    views: [{ state: "frozen", ySplit: 1 }],
+    properties: { defaultRowHeight: 20 },
+  });
+  sheet.columns = headers.map((header, index) => ({
+    header,
+    key: `column${index}`,
+    width: Math.min(
+      42,
+      Math.max(
+        13,
+        header.length + 3,
+        ...rows.map((row) => String(row[index] ?? "").length + 2),
+      ),
     ),
-  ].join("\r\n");
-  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  }));
+  rows.forEach((row) =>
+    sheet.addRow(
+      row.map((value) =>
+        value && typeof value === "object" && !(value instanceof Date)
+          ? String(value)
+          : (value ?? ""),
+      ),
+    ),
+  );
+  sheet.autoFilter = {
+    from: "A1",
+    to: sheet.getRow(1).getCell(headers.length).address,
+  };
+  const header = sheet.getRow(1);
+  header.height = 26;
+  header.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+  header.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FF173B62" },
+  };
+  header.alignment = { vertical: "middle" };
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber > 1 && rowNumber % 2 === 0)
+      row.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFF4F7FB" },
+      };
+    row.eachCell((cell) => {
+      cell.alignment = { vertical: "middle", wrapText: true };
+      cell.border = { bottom: { style: "hair", color: { argb: "FFDCE5EF" } } };
+      if (cell.value instanceof Date) cell.numFmt = "dd-mmm-yyyy hh:mm";
+    });
+  });
+  const output = await workbook.xlsx.writeBuffer();
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
   res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
-  res.send("\uFEFF" + output);
+  res.send(Buffer.from(output));
 }

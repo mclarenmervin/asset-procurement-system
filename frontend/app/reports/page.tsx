@@ -50,9 +50,9 @@ export default function Reports() {
             <button
               className="ghost"
               key={key}
-              onClick={() => download(`/reports/export/${key}`, `${key}.csv`)}
+              onClick={() => download(`/reports/export/${key}`, `${key}.xlsx`)}
             >
-              ↓ {label}
+              ↓ {label} · Excel
             </button>
           ))}
         </div>

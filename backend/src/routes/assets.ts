@@ -402,7 +402,7 @@ assetsRouter.post(
             type: "RECEIPT",
             toLocationId: asset.currentLocationId,
             movedByUserId: req.user!.id,
-            remarks: "Asset imported from CSV",
+            remarks: "Asset imported from Excel workbook",
           },
         });
         if (asset.custodianId)
@@ -411,7 +411,7 @@ assetsRouter.post(
               assetId: asset.id,
               userId: asset.custodianId,
               assignedByUserId: req.user!.id,
-              remarks: "Initial assignment from CSV import",
+              remarks: "Initial assignment from Excel import",
             },
           });
         result.push(asset);

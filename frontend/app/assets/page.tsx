@@ -4,7 +4,7 @@ import Link from "next/link";
 import { api, download } from "../../lib/api";
 import { Shell } from "../_components";
 import { FilterBar, filterRows, unique } from "../_filters";
-import { downloadAssetTemplate, parseAssetCsv } from "./csv";
+import { downloadAssetTemplate, parseAssetExcel } from "./excel";
 import { usePermission } from "../../lib/rbac";
 const blank: any = {
   assetTag: "",
@@ -108,15 +108,15 @@ export default function Assets() {
       setError(e.message);
     }
   }
-  async function importCsv(file?: File) {
+  async function importExcel(file?: File) {
     if (!file) return;
     setImporting(true);
     setError("");
     setImportErrors([]);
     try {
-      const rows = parseAssetCsv(await file.text());
+      const rows = await parseAssetExcel(file);
       if (!rows.length)
-        throw new Error("The CSV does not contain any asset rows");
+        throw new Error("The Excel workbook does not contain any asset rows");
       const result = await api("/assets/import", {
         method: "POST",
         body: JSON.stringify({ rows }),
@@ -148,16 +148,16 @@ export default function Assets() {
         <div />
         <div className="assetToolbar">
           <button className="ghost" onClick={downloadAssetTemplate}>
-            CSV template
+            Excel template
           </button>
           {mayExport && (
             <button
               className="ghost"
               onClick={() =>
-                download("/reports/export/assets", "asset-register.csv")
+                download("/reports/export/assets", "asset-register.xlsx")
               }
             >
-              Export CSV
+              Export Excel
             </button>
           )}
           {mayManage && (
@@ -166,7 +166,7 @@ export default function Assets() {
               disabled={importing}
               onClick={() => fileInput.current?.click()}
             >
-              {importing ? "Importing…" : "Import CSV"}
+              {importing ? "Importing…" : "Import Excel"}
             </button>
           )}
           {mayManage && (
@@ -174,8 +174,8 @@ export default function Assets() {
               ref={fileInput}
               className="fileInput"
               type="file"
-              accept=".csv,text/csv"
-              onChange={(event) => importCsv(event.target.files?.[0])}
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              onChange={(event) => importExcel(event.target.files?.[0])}
             />
           )}
           {mayManage && (

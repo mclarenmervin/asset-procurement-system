@@ -5,7 +5,7 @@ AssetFlow Enterprise is a full-stack asset, procurement and material-management 
 ## What is included
 
 - Organization, department, hierarchical location, vendor, category and product masters
-- Serialized asset registry with categories, flexible tags, CSV import/export, custodians, append-only movement history and printable URL QR labels that open the complete authorized asset record
+- Serialized asset registry with categories, flexible tags, Excel import/export, custodians, append-only movement history and printable URL QR labels that open the complete authorized asset record
 - Vendor-neutral IoT GPS tracking with device provisioning, asset assignment, route history, geofences, offline/battery/speed/tamper/SOS alerts and a built-in hardware simulator
 - Purchase requests, RFQs, vendor quotations, purchase orders and sequential approvals
 - Warehouses, storage bins, GRN inspection, batches, stock ledger, issue and return
@@ -13,7 +13,7 @@ AssetFlow Enterprise is a full-stack asset, procurement and material-management 
 - Private document upload/download, notifications and searchable audit history
 - Configurable approval workflow templates
 - Camera or manual QR physical verification with GPS, wrong-location and missing-asset detection
-- Dashboard analytics and authenticated CSV exports for assets, movements, procurement, stock, maintenance and verification
+- Dashboard analytics and authenticated Excel workbook exports for assets, movements, procurement, stock, maintenance and verification
 - Consistent live search and contextual status/type filters across registers, workflows, histories, audit data and reports
 - JWT authentication, signup, role permissions, tenant isolation and request validation
 - Centralized role-based access control with role-aware navigation, action visibility, live role refresh and department-scoped employee data
@@ -144,7 +144,7 @@ npm run build
 npm audit --omit=dev
 ```
 
-`GET /health` returns API and database readiness. All business endpoints are under `/api` and require authentication except login and signup. Reporting data is under `/api/reports`; CSV downloads use `/api/reports/export/:type`.
+`GET /health` returns API and database readiness. All business endpoints are under `/api` and require authentication except login and signup. Reporting data is under `/api/reports`; Excel workbook downloads use `/api/reports/export/:type`.
 
 ## Project structure
 
