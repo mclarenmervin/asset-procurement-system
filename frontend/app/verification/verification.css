@@ -1,1 +1,98 @@
-.sessionGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:20px}.summaryPills{display:flex;gap:7px;flex-wrap:wrap;margin:16px 0}.summaryPills span{background:#14253a;border-radius:999px;padding:6px 9px;font-size:12px}.summaryPills .ok,.scanResult.ok{color:#78d89b}.summaryPills .bad,.scanResult.bad{color:#ff8b9c}.full{width:100%;text-align:center}.sessionHero{display:flex;justify-content:space-between;align-items:center;margin-top:18px}.sessionActions{display:flex;gap:8px}.scanLayout{display:grid;grid-template-columns:1fr;margin-top:18px}.scanForm{display:grid;grid-template-columns:2fr 1fr 1fr 2fr;gap:12px;align-items:end}.scanForm label{font-size:13px;color:#a7b5c8}.scanButtons{display:flex;gap:8px;grid-column:1/-1;justify-content:flex-end}.camera{max-width:600px;margin:15px auto}.scanResult{margin-top:15px;padding:15px;background:#091625;border-radius:10px}.scanResult span{float:right}.largePills{justify-content:flex-end}@media(max-width:1000px){.sessionGrid{grid-template-columns:1fr 1fr}.scanForm{grid-template-columns:1fr 1fr}}@media(max-width:650px){.sessionGrid,.scanForm{grid-template-columns:1fr}.sessionHero{align-items:flex-start;flex-direction:column}.largePills{justify-content:flex-start}}
+.sessionGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 20px;
+}
+.summaryPills {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.summaryPills span {
+  background: #14253a;
+  border-radius: 999px;
+  padding: 6px 9px;
+  font-size: 12px;
+}
+.summaryPills .ok,
+.scanResult.ok {
+  color: #78d89b;
+}
+.summaryPills .bad,
+.scanResult.bad {
+  color: #ff8b9c;
+}
+.full {
+  width: 100%;
+  text-align: center;
+}
+.sessionHero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 18px;
+}
+.sessionActions {
+  display: flex;
+  gap: 8px;
+}
+.scanLayout {
+  display: grid;
+  grid-template-columns: 1fr;
+  margin-top: 18px;
+}
+.scanForm {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 2fr;
+  gap: 12px;
+  align-items: end;
+}
+.scanForm label {
+  font-size: 13px;
+  color: #a7b5c8;
+}
+.scanButtons {
+  display: flex;
+  gap: 8px;
+  grid-column: 1/-1;
+  justify-content: flex-end;
+}
+.camera {
+  max-width: 600px;
+  margin: 15px auto;
+}
+.scanResult {
+  margin-top: 15px;
+  padding: 15px;
+  background: #091625;
+  border-radius: 10px;
+}
+.scanResult span {
+  float: right;
+}
+.largePills {
+  justify-content: flex-end;
+}
+@media (max-width: 1000px) {
+  .sessionGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .scanForm {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 650px) {
+  .sessionGrid,
+  .scanForm {
+    grid-template-columns: 1fr;
+  }
+  .sessionHero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .largePills {
+    justify-content: flex-start;
+  }
+}

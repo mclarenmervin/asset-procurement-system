@@ -1,8 +1,9 @@
 import { Router, Response } from "express";
 import { prisma } from "../db.js";
 import { auth, AuthRequest } from "../middleware/auth.js";
+import { permit } from "../rbac.js";
 export const reportsRouter = Router();
-reportsRouter.use(auth);
+reportsRouter.use(auth, permit("reports.view"));
 reportsRouter.get("/analytics", async (req: AuthRequest, res) => {
   const org = req.user!.organizationId,
     now = new Date(),

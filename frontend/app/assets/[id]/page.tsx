@@ -5,7 +5,11 @@ import QRCode from "qrcode";
 import { api, download, upload } from "../../../lib/api";
 import { Shell } from "../../_components";
 import { FilterBar, filterRows } from "../../_filters";
+import { usePermission } from "../../../lib/rbac";
 export default function AssetDetail() {
+  const mayMove = usePermission("assets.move"),
+    mayManageDocuments = usePermission("documents.manage"),
+    mayDeleteDocuments = usePermission("documents.delete");
   const { id } = useParams<{ id: string }>(),
     [asset, setAsset] = useState<any>(null),
     [options, setOptions] = useState<any>(null),
@@ -177,57 +181,59 @@ export default function AssetDetail() {
           total={historyTotal}
         />
       </section>
-      <section className="card section noPrint">
-        <h3>Record movement</h3>
-        {error && <p className="error">{error}</p>}
-        <form className="moveForm" onSubmit={submit}>
-          <label>
-            Movement type
-            <select
-              className="input"
-              value={move.type}
-              onChange={(e) => setMove({ ...move, type: e.target.value })}
-            >
-              {[
-                "ISSUE",
-                "TRANSFER",
-                "RETURN",
-                "MAINTENANCE",
-                "DISPOSAL",
-                "PHYSICAL_VERIFICATION",
-              ].map((x) => (
-                <option key={x}>{x}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Destination
-            <select
-              className="input"
-              value={move.toLocationId}
-              onChange={(e) =>
-                setMove({ ...move, toLocationId: e.target.value })
-              }
-            >
-              <option value="">No location</option>
-              {options?.locations.map((x: any) => (
-                <option key={x.id} value={x.id}>
-                  {x.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Remarks
-            <input
-              className="input"
-              value={move.remarks}
-              onChange={(e) => setMove({ ...move, remarks: e.target.value })}
-            />
-          </label>
-          <button className="btn">Record movement</button>
-        </form>
-      </section>
+      {mayMove && (
+        <section className="card section noPrint">
+          <h3>Record movement</h3>
+          {error && <p className="error">{error}</p>}
+          <form className="moveForm" onSubmit={submit}>
+            <label>
+              Movement type
+              <select
+                className="input"
+                value={move.type}
+                onChange={(e) => setMove({ ...move, type: e.target.value })}
+              >
+                {[
+                  "ISSUE",
+                  "TRANSFER",
+                  "RETURN",
+                  "MAINTENANCE",
+                  "DISPOSAL",
+                  "PHYSICAL_VERIFICATION",
+                ].map((x) => (
+                  <option key={x}>{x}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Destination
+              <select
+                className="input"
+                value={move.toLocationId}
+                onChange={(e) =>
+                  setMove({ ...move, toLocationId: e.target.value })
+                }
+              >
+                <option value="">No location</option>
+                {options?.locations.map((x: any) => (
+                  <option key={x.id} value={x.id}>
+                    {x.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Remarks
+              <input
+                className="input"
+                value={move.remarks}
+                onChange={(e) => setMove({ ...move, remarks: e.target.value })}
+              />
+            </label>
+            <button className="btn">Record movement</button>
+          </form>
+        </section>
+      )}
       <section className="card section noPrint">
         <h3>Movement history</h3>
         <div className="tableWrap">
@@ -266,32 +272,34 @@ export default function AssetDetail() {
       </section>
       <section className="card section noPrint">
         <h3>Documents</h3>
-        <form className="documentForm" onSubmit={uploadDocument}>
-          <select
-            className="input"
-            value={documentType}
-            onChange={(e) => setDocumentType(e.target.value)}
-          >
-            {[
-              "INVOICE",
-              "WARRANTY",
-              "INSPECTION",
-              "MANUAL",
-              "CERTIFICATE",
-              "OTHER",
-            ].map((type) => (
-              <option key={type}>{type}</option>
-            ))}
-          </select>
-          <input
-            required
-            className="input"
-            type="file"
-            accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.doc,.docx"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
-          />
-          <button className="btn">Upload</button>
-        </form>
+        {mayManageDocuments && (
+          <form className="documentForm" onSubmit={uploadDocument}>
+            <select
+              className="input"
+              value={documentType}
+              onChange={(e) => setDocumentType(e.target.value)}
+            >
+              {[
+                "INVOICE",
+                "WARRANTY",
+                "INSPECTION",
+                "MANUAL",
+                "CERTIFICATE",
+                "OTHER",
+              ].map((type) => (
+                <option key={type}>{type}</option>
+              ))}
+            </select>
+            <input
+              required
+              className="input"
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.doc,.docx"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+            />
+            <button className="btn">Upload</button>
+          </form>
+        )}
         <table className="table">
           <thead>
             <tr>
@@ -320,12 +328,14 @@ export default function AssetDetail() {
                     >
                       Download
                     </button>
-                    <button
-                      className="danger"
-                      onClick={() => removeDocument(document.id)}
-                    >
-                      Delete
-                    </button>
+                    {mayDeleteDocuments && (
+                      <button
+                        className="danger"
+                        onClick={() => removeDocument(document.id)}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

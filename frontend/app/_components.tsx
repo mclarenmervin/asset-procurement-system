@@ -2,18 +2,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { can, Permission, useSession } from "../lib/rbac";
 const navigation = [
-  ["/dashboard", "Dashboard"],
-  ["/reports", "Reports & Analytics"],
-  ["/assets", "Assets"],
-  ["/vendors", "Vendors"],
-  ["/procurement", "Procurement"],
-  ["/inventory", "Stores & Inventory"],
-  ["/maintenance", "Maintenance & Compliance"],
-  ["/verification", "Physical Verification"],
-  ["/governance", "Notifications & Audit"],
-  ["/locations", "Locations"],
-  ["/master-data", "Master Data"],
+  ["/dashboard", "Dashboard", "dashboard.view"],
+  ["/reports", "Reports & Analytics", "reports.view"],
+  ["/assets", "Assets", "assets.view"],
+  ["/vendors", "Vendors", "vendors.view"],
+  ["/procurement", "Procurement", "procurement.view"],
+  ["/inventory", "Stores & Inventory", "inventory.view"],
+  ["/maintenance", "Maintenance & Compliance", "maintenance.view"],
+  ["/verification", "Physical Verification", "verification.view"],
+  ["/governance", "Notifications & Audit", "governance.view"],
+  ["/locations", "Locations", "locations.view"],
+  ["/master-data", "Master Data", "masters.view"],
 ] as const;
 export function Shell({
   title,
@@ -25,7 +26,15 @@ export function Shell({
   back?: { href: string; label: string };
 }) {
   const pathname = usePathname(),
+    user = useSession(),
     [menuOpen, setMenuOpen] = useState(false);
+  const pagePermission = navigation.find(
+    ([href]) =>
+      pathname === href ||
+      (href !== "/dashboard" && pathname.startsWith(href + "/")),
+  )?.[2] as Permission | undefined;
+  const allowed =
+    !pagePermission || user === undefined || can(user?.role, pagePermission);
   function logout() {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -58,22 +67,24 @@ export function Shell({
           </button>
         </div>
         <nav className="nav" aria-label="Main navigation">
-          {navigation.map(([href, label]) => {
-            const active =
-              pathname === href ||
-              (href !== "/dashboard" && pathname.startsWith(href + "/"));
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={active ? "active" : ""}
-                onClick={() => setMenuOpen(false)}
-              >
-                {label}
-              </Link>
-            );
-          })}
+          {navigation
+            .filter(([, , permission]) => can(user?.role, permission))
+            .map(([href, label]) => {
+              const active =
+                pathname === href ||
+                (href !== "/dashboard" && pathname.startsWith(href + "/"));
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={active ? "active" : ""}
+                  onClick={() => setMenuOpen(false)}
+                >
+                  {label}
+                </Link>
+              );
+            })}
         </nav>
       </aside>
       <main className="main">
@@ -99,12 +110,32 @@ export function Shell({
               </div>
             </div>
           </div>
-          <button className="btn logoutButton" onClick={logout}>
-            Logout
-          </button>
+          <div className="userAccess">
+            <span>
+              {user?.name || "Signed in"}
+              <small>{user?.role?.replaceAll("_", " ")}</small>
+            </span>
+            <button className="btn logoutButton" onClick={logout}>
+              Logout
+            </button>
+          </div>
         </div>
-        {children}
+        {allowed ? children : <AccessDenied />}
       </main>
     </div>
+  );
+}
+function AccessDenied() {
+  return (
+    <section className="card section accessDenied">
+      <span>403</span>
+      <h2>Access restricted</h2>
+      <p className="muted">
+        Your role does not have permission to open this module.
+      </p>
+      <Link className="btn" href="/dashboard">
+        Return to dashboard
+      </Link>
+    </section>
   );
 }

@@ -1,12 +1,13 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
-import { auth, authorize, AuthRequest } from "../middleware/auth.js";
+import { auth, AuthRequest } from "../middleware/auth.js";
 import { audit } from "../audit.js";
 import { AppError } from "../middleware/errors.js";
+import { permit } from "../rbac.js";
 export const inventoryRouter = Router();
-inventoryRouter.use(auth);
-const stores = authorize("SUPER_ADMIN", "ORG_ADMIN", "STORE_MANAGER");
+inventoryRouter.use(auth, permit("inventory.view"));
+const stores = permit("inventory.manage");
 const warehouse = z.object({
   name: z.string().trim().min(2),
   code: z.string().trim().min(1),

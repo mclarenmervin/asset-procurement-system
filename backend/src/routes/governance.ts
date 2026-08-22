@@ -1,12 +1,263 @@
-import {Router} from 'express';import {z} from 'zod';import {prisma} from '../db.js';import {auth,authorize,AuthRequest} from '../middleware/auth.js';import {audit} from '../audit.js';import {AppError} from '../middleware/errors.js';
-export const governanceRouter=Router();governanceRouter.use(auth);
-governanceRouter.get('/audit',authorize('SUPER_ADMIN','ORG_ADMIN','AUDITOR'),async(req:AuthRequest,res)=>{const q=String(req.query.q||''),action=String(req.query.action||'');res.json(await prisma.auditLog.findMany({where:{organizationId:req.user!.organizationId,action:action||undefined,OR:q?[{entityType:{contains:q,mode:'insensitive'}},{action:{contains:q,mode:'insensitive'}},{entityId:{contains:q,mode:'insensitive'}}]:undefined},take:300,orderBy:{createdAt:'desc'}}))});
-governanceRouter.get('/notifications',async(req:AuthRequest,res)=>res.json(await prisma.notification.findMany({where:{organizationId:req.user!.organizationId,OR:[{userId:null},{userId:req.user!.id}]},orderBy:{createdAt:'desc'},take:100})));
-governanceRouter.post('/notifications/:id/read',async(req:AuthRequest,res)=>{const id=String(req.params.id),row=await prisma.notification.findFirst({where:{id,organizationId:req.user!.organizationId,OR:[{userId:null},{userId:req.user!.id}]}});if(!row)throw new AppError(404,'Notification not found');res.json(await prisma.notification.update({where:{id},data:{readAt:new Date()}}))});
-governanceRouter.post('/notifications/scan',authorize('SUPER_ADMIN','ORG_ADMIN','ASSET_MANAGER','MAINTENANCE'),async(req:AuthRequest,res)=>{const org=req.user!.organizationId,now=new Date(),soon=new Date(Date.now()+60*86400000);const [assets,records,contracts]=await Promise.all([prisma.asset.findMany({where:{organizationId:org,OR:[{warrantyEndDate:{lte:soon}},{expiryDate:{lte:soon}}]},select:{id:true,assetTag:true,warrantyEndDate:true,expiryDate:true}}),prisma.complianceRecord.findMany({where:{organizationId:org,dueDate:{lte:soon},completedDate:null},include:{asset:{select:{assetTag:true}}}}),prisma.aMCContract.findMany({where:{organizationId:org,endDate:{lte:soon}}})]);let created=0;for(const a of assets){for(const [type,date] of [['WARRANTY',a.warrantyEndDate],['EXPIRY',a.expiryDate]] as const){if(date){created+=await notice(org,`${type}:${a.id}:${date.toISOString().slice(0,10)}`,`${type} ${date<now?'overdue':'due soon'}`,`${a.assetTag} ${type.toLowerCase()} date is ${date.toLocaleDateString()}`,date<now?'OVERDUE':'WARNING',`/assets/${a.id}`)}}}for(const c of records)created+=await notice(org,`COMPLIANCE:${c.id}:${c.dueDate.toISOString().slice(0,10)}`,`${c.type} ${c.dueDate<now?'overdue':'due soon'}`,`${c.asset.assetTag} is due ${c.dueDate.toLocaleDateString()}`,c.dueDate<now?'OVERDUE':'WARNING',`/maintenance`);for(const c of contracts)created+=await notice(org,`AMC:${c.id}:${c.endDate.toISOString().slice(0,10)}`,`AMC ${c.endDate<now?'expired':'expiring'}`,`${c.contractNumber} for ${c.providerName} ends ${c.endDate.toLocaleDateString()}`,c.endDate<now?'OVERDUE':'WARNING','/maintenance');res.json({created,totalCandidates:assets.length+records.length+contracts.length})});
-const roles=z.enum(['SUPER_ADMIN','ORG_ADMIN','PROCUREMENT_OFFICER','STORE_MANAGER','DEPARTMENT_HEAD','ASSET_MANAGER','MAINTENANCE','FINANCE','AUDITOR','EMPLOYEE']);const workflow=z.object({name:z.string().trim().min(2),entityType:z.string().trim().min(2),description:z.string().max(1000).optional(),active:z.boolean().default(true),steps:z.array(z.object({step:z.coerce.number().int().positive(),name:z.string().trim().min(2),approverRole:roles,minimumAmount:z.preprocess(v=>v===''?null:v,z.coerce.number().nonnegative().nullable().optional())})).min(1)});
-governanceRouter.get('/workflows',async(req:AuthRequest,res)=>res.json(await prisma.workflowTemplate.findMany({where:{organizationId:req.user!.organizationId},include:{steps:{orderBy:{step:'asc'}}},orderBy:{name:'asc'}})));
-governanceRouter.post('/workflows',authorize('SUPER_ADMIN','ORG_ADMIN'),async(req:AuthRequest,res)=>{const {steps,...d}=workflow.parse(req.body);if(new Set(steps.map(s=>s.step)).size!==steps.length)throw new AppError(400,'Workflow step numbers must be unique');const row=await prisma.workflowTemplate.create({data:{...d,organizationId:req.user!.organizationId,steps:{create:steps}},include:{steps:true}});await audit(req,'CREATE','WorkflowTemplate',row.id,undefined,row);res.status(201).json(row)});
-governanceRouter.put('/workflows/:id',authorize('SUPER_ADMIN','ORG_ADMIN'),async(req:AuthRequest,res)=>{const id=String(req.params.id),before=await prisma.workflowTemplate.findFirst({where:{id,organizationId:req.user!.organizationId},include:{steps:true}});if(!before)throw new AppError(404,'Workflow not found');const {steps,...d}=workflow.parse(req.body);const row=await prisma.$transaction(async tx=>{await tx.workflowStep.deleteMany({where:{workflowTemplateId:id}});return tx.workflowTemplate.update({where:{id},data:{...d,steps:{create:steps}},include:{steps:true}})});await audit(req,'UPDATE','WorkflowTemplate',id,before,row);res.json(row)});
-governanceRouter.delete('/workflows/:id',authorize('SUPER_ADMIN','ORG_ADMIN'),async(req:AuthRequest,res)=>{const id=String(req.params.id),before=await prisma.workflowTemplate.findFirst({where:{id,organizationId:req.user!.organizationId}});if(!before)throw new AppError(404,'Workflow not found');await prisma.workflowTemplate.delete({where:{id}});await audit(req,'DELETE','WorkflowTemplate',id,before);res.status(204).end()});
-async function notice(org:string,key:string,title:string,message:string,type:string,link:string){const exists=await prisma.notification.findUnique({where:{dedupeKey:`${org}:${key}`}});if(exists)return 0;await prisma.notification.create({data:{organizationId:org,dedupeKey:`${org}:${key}`,title,message,type,link}});return 1}
+import { Router } from "express";
+import { z } from "zod";
+import { prisma } from "../db.js";
+import { auth, AuthRequest } from "../middleware/auth.js";
+import { audit } from "../audit.js";
+import { AppError } from "../middleware/errors.js";
+import { permit } from "../rbac.js";
+export const governanceRouter = Router();
+governanceRouter.use(auth, permit("governance.view"));
+governanceRouter.get(
+  "/audit",
+  permit("audit.view"),
+  async (req: AuthRequest, res) => {
+    const q = String(req.query.q || ""),
+      action = String(req.query.action || "");
+    res.json(
+      await prisma.auditLog.findMany({
+        where: {
+          organizationId: req.user!.organizationId,
+          action: action || undefined,
+          OR: q
+            ? [
+                { entityType: { contains: q, mode: "insensitive" } },
+                { action: { contains: q, mode: "insensitive" } },
+                { entityId: { contains: q, mode: "insensitive" } },
+              ]
+            : undefined,
+        },
+        take: 300,
+        orderBy: { createdAt: "desc" },
+      }),
+    );
+  },
+);
+governanceRouter.get("/notifications", async (req: AuthRequest, res) =>
+  res.json(
+    await prisma.notification.findMany({
+      where: {
+        organizationId: req.user!.organizationId,
+        OR: [{ userId: null }, { userId: req.user!.id }],
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+  ),
+);
+governanceRouter.post(
+  "/notifications/:id/read",
+  async (req: AuthRequest, res) => {
+    const id = String(req.params.id),
+      row = await prisma.notification.findFirst({
+        where: {
+          id,
+          organizationId: req.user!.organizationId,
+          OR: [{ userId: null }, { userId: req.user!.id }],
+        },
+      });
+    if (!row) throw new AppError(404, "Notification not found");
+    res.json(
+      await prisma.notification.update({
+        where: { id },
+        data: { readAt: new Date() },
+      }),
+    );
+  },
+);
+governanceRouter.post(
+  "/notifications/scan",
+  permit("maintenance.manage"),
+  async (req: AuthRequest, res) => {
+    const org = req.user!.organizationId,
+      now = new Date(),
+      soon = new Date(Date.now() + 60 * 86400000);
+    const [assets, records, contracts] = await Promise.all([
+      prisma.asset.findMany({
+        where: {
+          organizationId: org,
+          OR: [
+            { warrantyEndDate: { lte: soon } },
+            { expiryDate: { lte: soon } },
+          ],
+        },
+        select: {
+          id: true,
+          assetTag: true,
+          warrantyEndDate: true,
+          expiryDate: true,
+        },
+      }),
+      prisma.complianceRecord.findMany({
+        where: {
+          organizationId: org,
+          dueDate: { lte: soon },
+          completedDate: null,
+        },
+        include: { asset: { select: { assetTag: true } } },
+      }),
+      prisma.aMCContract.findMany({
+        where: { organizationId: org, endDate: { lte: soon } },
+      }),
+    ]);
+    let created = 0;
+    for (const a of assets) {
+      for (const [type, date] of [
+        ["WARRANTY", a.warrantyEndDate],
+        ["EXPIRY", a.expiryDate],
+      ] as const) {
+        if (date) {
+          created += await notice(
+            org,
+            `${type}:${a.id}:${date.toISOString().slice(0, 10)}`,
+            `${type} ${date < now ? "overdue" : "due soon"}`,
+            `${a.assetTag} ${type.toLowerCase()} date is ${date.toLocaleDateString()}`,
+            date < now ? "OVERDUE" : "WARNING",
+            `/assets/${a.id}`,
+          );
+        }
+      }
+    }
+    for (const c of records)
+      created += await notice(
+        org,
+        `COMPLIANCE:${c.id}:${c.dueDate.toISOString().slice(0, 10)}`,
+        `${c.type} ${c.dueDate < now ? "overdue" : "due soon"}`,
+        `${c.asset.assetTag} is due ${c.dueDate.toLocaleDateString()}`,
+        c.dueDate < now ? "OVERDUE" : "WARNING",
+        `/maintenance`,
+      );
+    for (const c of contracts)
+      created += await notice(
+        org,
+        `AMC:${c.id}:${c.endDate.toISOString().slice(0, 10)}`,
+        `AMC ${c.endDate < now ? "expired" : "expiring"}`,
+        `${c.contractNumber} for ${c.providerName} ends ${c.endDate.toLocaleDateString()}`,
+        c.endDate < now ? "OVERDUE" : "WARNING",
+        "/maintenance",
+      );
+    res.json({
+      created,
+      totalCandidates: assets.length + records.length + contracts.length,
+    });
+  },
+);
+const roles = z.enum([
+  "SUPER_ADMIN",
+  "ORG_ADMIN",
+  "PROCUREMENT_OFFICER",
+  "STORE_MANAGER",
+  "DEPARTMENT_HEAD",
+  "ASSET_MANAGER",
+  "MAINTENANCE",
+  "FINANCE",
+  "AUDITOR",
+  "EMPLOYEE",
+]);
+const workflow = z.object({
+  name: z.string().trim().min(2),
+  entityType: z.string().trim().min(2),
+  description: z.string().max(1000).optional(),
+  active: z.boolean().default(true),
+  steps: z
+    .array(
+      z.object({
+        step: z.coerce.number().int().positive(),
+        name: z.string().trim().min(2),
+        approverRole: roles,
+        minimumAmount: z.preprocess(
+          (v) => (v === "" ? null : v),
+          z.coerce.number().nonnegative().nullable().optional(),
+        ),
+      }),
+    )
+    .min(1),
+});
+governanceRouter.get("/workflows", async (req: AuthRequest, res) =>
+  res.json(
+    await prisma.workflowTemplate.findMany({
+      where: { organizationId: req.user!.organizationId },
+      include: { steps: { orderBy: { step: "asc" } } },
+      orderBy: { name: "asc" },
+    }),
+  ),
+);
+governanceRouter.post(
+  "/workflows",
+  permit("workflows.manage"),
+  async (req: AuthRequest, res) => {
+    const { steps, ...d } = workflow.parse(req.body);
+    if (new Set(steps.map((s) => s.step)).size !== steps.length)
+      throw new AppError(400, "Workflow step numbers must be unique");
+    const row = await prisma.workflowTemplate.create({
+      data: {
+        ...d,
+        organizationId: req.user!.organizationId,
+        steps: { create: steps },
+      },
+      include: { steps: true },
+    });
+    await audit(req, "CREATE", "WorkflowTemplate", row.id, undefined, row);
+    res.status(201).json(row);
+  },
+);
+governanceRouter.put(
+  "/workflows/:id",
+  permit("workflows.manage"),
+  async (req: AuthRequest, res) => {
+    const id = String(req.params.id),
+      before = await prisma.workflowTemplate.findFirst({
+        where: { id, organizationId: req.user!.organizationId },
+        include: { steps: true },
+      });
+    if (!before) throw new AppError(404, "Workflow not found");
+    const { steps, ...d } = workflow.parse(req.body);
+    const row = await prisma.$transaction(async (tx) => {
+      await tx.workflowStep.deleteMany({ where: { workflowTemplateId: id } });
+      return tx.workflowTemplate.update({
+        where: { id },
+        data: { ...d, steps: { create: steps } },
+        include: { steps: true },
+      });
+    });
+    await audit(req, "UPDATE", "WorkflowTemplate", id, before, row);
+    res.json(row);
+  },
+);
+governanceRouter.delete(
+  "/workflows/:id",
+  permit("workflows.manage"),
+  async (req: AuthRequest, res) => {
+    const id = String(req.params.id),
+      before = await prisma.workflowTemplate.findFirst({
+        where: { id, organizationId: req.user!.organizationId },
+      });
+    if (!before) throw new AppError(404, "Workflow not found");
+    await prisma.workflowTemplate.delete({ where: { id } });
+    await audit(req, "DELETE", "WorkflowTemplate", id, before);
+    res.status(204).end();
+  },
+);
+async function notice(
+  org: string,
+  key: string,
+  title: string,
+  message: string,
+  type: string,
+  link: string,
+) {
+  const exists = await prisma.notification.findUnique({
+    where: { dedupeKey: `${org}:${key}` },
+  });
+  if (exists) return 0;
+  await prisma.notification.create({
+    data: {
+      organizationId: org,
+      dedupeKey: `${org}:${key}`,
+      title,
+      message,
+      type,
+      link,
+    },
+  });
+  return 1;
+}

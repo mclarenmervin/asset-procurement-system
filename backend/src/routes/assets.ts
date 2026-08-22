@@ -1,23 +1,30 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
-import { auth, authorize, AuthRequest } from "../middleware/auth.js";
+import { auth, AuthRequest } from "../middleware/auth.js";
 import { audit } from "../audit.js";
 import { AppError } from "../middleware/errors.js";
+import { assetScope, can, permit } from "../rbac.js";
 export const assetsRouter = Router();
 assetsRouter.use(auth);
+assetsRouter.use(permit("assets.view"));
 assetsRouter.get("/", async (req: AuthRequest, res) => {
   const q = String(req.query.q || "");
   const rows = await prisma.asset.findMany({
     where: {
       organizationId: req.user!.organizationId,
-      OR: q
-        ? [
-            { assetTag: { contains: q, mode: "insensitive" } },
-            { serialNumber: { contains: q, mode: "insensitive" } },
-            { product: { name: { contains: q, mode: "insensitive" } } },
-          ]
-        : undefined,
+      AND: [
+        assetScope(req),
+        q
+          ? {
+              OR: [
+                { assetTag: { contains: q, mode: "insensitive" } },
+                { serialNumber: { contains: q, mode: "insensitive" } },
+                { product: { name: { contains: q, mode: "insensitive" } } },
+              ],
+            }
+          : {},
+      ],
     },
     include: {
       product: true,
@@ -32,7 +39,8 @@ assetsRouter.get("/", async (req: AuthRequest, res) => {
   res.json(rows);
 });
 assetsRouter.get("/options/all", async (req: AuthRequest, res) => {
-  const org = req.user!.organizationId;
+  const org = req.user!.organizationId,
+    manage = can(req.user!.role, "assets.manage");
   const [
     products,
     categories,
@@ -50,10 +58,12 @@ assetsRouter.get("/options/all", async (req: AuthRequest, res) => {
       where: { organizationId: org },
       orderBy: { name: "asc" },
     }),
-    prisma.vendor.findMany({
-      where: { organizationId: org },
-      orderBy: { name: "asc" },
-    }),
+    manage
+      ? prisma.vendor.findMany({
+          where: { organizationId: org },
+          orderBy: { name: "asc" },
+        })
+      : [],
     prisma.department.findMany({
       where: { organizationId: org },
       orderBy: { name: "asc" },
@@ -62,16 +72,20 @@ assetsRouter.get("/options/all", async (req: AuthRequest, res) => {
       where: { organizationId: org },
       orderBy: { name: "asc" },
     }),
-    prisma.user.findMany({
-      where: { organizationId: org },
-      select: { id: true, name: true, email: true },
-      orderBy: { name: "asc" },
-    }),
-    prisma.purchaseOrder.findMany({
-      where: { organizationId: org },
-      select: { id: true, poNumber: true },
-      orderBy: { poDate: "desc" },
-    }),
+    manage
+      ? prisma.user.findMany({
+          where: { organizationId: org },
+          select: { id: true, name: true, email: true },
+          orderBy: { name: "asc" },
+        })
+      : [],
+    manage
+      ? prisma.purchaseOrder.findMany({
+          where: { organizationId: org },
+          select: { id: true, poNumber: true },
+          orderBy: { poDate: "desc" },
+        })
+      : [],
   ]);
   res.json({
     products,
@@ -88,6 +102,7 @@ assetsRouter.get("/:id", async (req: AuthRequest, res) => {
     where: {
       id: String(req.params.id),
       organizationId: req.user!.organizationId,
+      ...assetScope(req),
     },
     include: {
       product: true,
@@ -196,7 +211,7 @@ const importSchema = z.object({
 
 assetsRouter.post(
   "/import",
-  authorize("SUPER_ADMIN", "ORG_ADMIN", "ASSET_MANAGER", "STORE_MANAGER"),
+  permit("assets.manage"),
   async (req: AuthRequest, res) => {
     const { rows } = importSchema.parse(req.body),
       org = req.user!.organizationId;
@@ -412,7 +427,7 @@ assetsRouter.post(
 );
 assetsRouter.post(
   "/",
-  authorize("SUPER_ADMIN", "ORG_ADMIN", "ASSET_MANAGER", "STORE_MANAGER"),
+  permit("assets.manage"),
   async (req: AuthRequest, res) => {
     const b = assetSchema.parse(req.body),
       org = req.user!.organizationId;
@@ -451,7 +466,7 @@ assetsRouter.post(
 );
 assetsRouter.put(
   "/:id",
-  authorize("SUPER_ADMIN", "ORG_ADMIN", "ASSET_MANAGER", "STORE_MANAGER"),
+  permit("assets.manage"),
   async (req: AuthRequest, res) => {
     const id = String(req.params.id),
       before = await prisma.asset.findFirst({
@@ -496,7 +511,7 @@ assetsRouter.put(
 );
 assetsRouter.delete(
   "/:id",
-  authorize("SUPER_ADMIN", "ORG_ADMIN", "ASSET_MANAGER"),
+  permit("assets.delete"),
   async (req: AuthRequest, res) => {
     const id = String(req.params.id),
       before = await prisma.asset.findFirst({
@@ -525,13 +540,7 @@ const moveSchema = z.object({
 });
 assetsRouter.post(
   "/:id/move",
-  authorize(
-    "SUPER_ADMIN",
-    "ORG_ADMIN",
-    "ASSET_MANAGER",
-    "STORE_MANAGER",
-    "MAINTENANCE",
-  ),
+  permit("assets.move"),
   async (req: AuthRequest, res) => {
     const a = await prisma.asset.findFirst({
       where: {

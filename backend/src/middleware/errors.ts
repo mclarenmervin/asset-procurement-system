@@ -13,12 +13,10 @@ export const errors: ErrorRequestHandler = (error, _req, res, _next) => {
   if (error instanceof AppError)
     return res.status(error.status).json({ message: error.message });
   if (error instanceof ZodError)
-    return res
-      .status(400)
-      .json({
-        message: "Validation failed",
-        errors: error.flatten().fieldErrors,
-      });
+    return res.status(400).json({
+      message: "Validation failed",
+      errors: error.flatten().fieldErrors,
+    });
   if (error?.name === "MulterError")
     return res.status(400).json({
       message:

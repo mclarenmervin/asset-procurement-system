@@ -65,6 +65,37 @@ a {
   align-items: center;
   margin-bottom: 24px;
 }
+.userAccess {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: right;
+}
+.userAccess span {
+  font-size: 13px;
+  font-weight: 700;
+}
+.userAccess small {
+  display: block;
+  margin-top: 3px;
+  color: #7790ad;
+  font-size: 10px;
+  letter-spacing: 0.07em;
+}
+.accessDenied {
+  max-width: 540px;
+  margin: 70px auto;
+  text-align: center;
+  padding: 42px;
+}
+.accessDenied > span {
+  color: #ff8b9a;
+  font-size: 42px;
+  font-weight: 800;
+}
+.accessDenied h2 {
+  margin: 8px 0;
+}
 .topIdentity {
   justify-content: flex-start;
   gap: 12px;

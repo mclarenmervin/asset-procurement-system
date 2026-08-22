@@ -1,3 +1,72 @@
-'use client';
-import {useState} from 'react'; import Link from 'next/link'; import {API} from '../../lib/api';
-export default function Login(){const [email,setEmail]=useState('admin@demo.local'),[password,setPassword]=useState('Admin@123'),[error,setError]=useState(''),[busy,setBusy]=useState(false);async function submit(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');try{const response=await fetch(API+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});const body=await response.json();if(!response.ok)throw new Error(body.message);localStorage.setItem('token',body.token);localStorage.setItem('user',JSON.stringify(body.user));const next=new URLSearchParams(location.search).get('next');location.href=next?.startsWith('/')&&!next.startsWith('//')?next:'/dashboard'}catch(error:any){setError(error.message||'Could not sign in')}finally{setBusy(false)}}return <div className="loginwrap"><form className="login" onSubmit={submit}><Link href="/" className="back">← AssetFlow</Link><h1>Welcome back</h1><p className="muted">Sign in to your operations workspace.</p><label>Email<input required type="email" className="input" value={email} onChange={e=>setEmail(e.target.value)}/></label><label>Password<input required type="password" className="input" value={password} onChange={e=>setPassword(e.target.value)}/></label>{error&&<p className="error">{error}</p>}<button disabled={busy} className="btn full">{busy?'Signing in…':'Sign in'}</button><p className="muted center">New organization? <Link href="/signup">Create a workspace</Link></p><p className="demo">Demo: admin@demo.local / Admin@123</p></form></div>}
+"use client";
+import { useState } from "react";
+import Link from "next/link";
+import { API } from "../../lib/api";
+export default function Login() {
+  const [email, setEmail] = useState("admin@demo.local"),
+    [password, setPassword] = useState("Admin@123"),
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false);
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch(API + "/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.message);
+      localStorage.setItem("token", body.token);
+      localStorage.setItem("user", JSON.stringify(body.user));
+      const next = new URLSearchParams(location.search).get("next");
+      location.href =
+        next?.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+    } catch (error: any) {
+      setError(error.message || "Could not sign in");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="loginwrap">
+      <form className="login" onSubmit={submit}>
+        <Link href="/" className="back">
+          ← AssetFlow
+        </Link>
+        <h1>Welcome back</h1>
+        <p className="muted">Sign in to your operations workspace.</p>
+        <label>
+          Email
+          <input
+            required
+            type="email"
+            className="input"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </label>
+        <label>
+          Password
+          <input
+            required
+            type="password"
+            className="input"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </label>
+        {error && <p className="error">{error}</p>}
+        <button disabled={busy} className="btn full">
+          {busy ? "Signing in…" : "Sign in"}
+        </button>
+        <p className="muted center">
+          New organization? <Link href="/signup">Create a workspace</Link>
+        </p>
+        <p className="demo">Demo: admin@demo.local / Admin@123</p>
+      </form>
+    </div>
+  );
+}

@@ -3,7 +3,10 @@ import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { Shell } from "../_components";
 import { FilterBar, filterRows, unique } from "../_filters";
+import { usePermission } from "../../lib/rbac";
 export default function Maintenance() {
+  const mayManage = usePermission("maintenance.manage"),
+    mayApprove = usePermission("maintenance.approve");
   const [tab, setTab] = useState("work"),
     [records, setRecords] = useState<any[]>([]),
     [contracts, setContracts] = useState<any[]>([]),
@@ -89,18 +92,20 @@ export default function Maintenance() {
         ))}
       </div>
       {error && <p className="error">{error}</p>}
-      <Head
-        title={
-          tab === "work"
-            ? "Maintenance work orders"
-            : tab === "compliance"
-              ? "Warranty, insurance & calibration"
-              : tab === "amc"
-                ? "Annual maintenance contracts"
-                : "Asset disposal workflow"
-        }
-        add={() => setForm(true)}
-      />
+      {mayManage && (
+        <Head
+          title={
+            tab === "work"
+              ? "Maintenance work orders"
+              : tab === "compliance"
+                ? "Warranty, insurance & calibration"
+                : tab === "amc"
+                  ? "Annual maintenance contracts"
+                  : "Asset disposal workflow"
+          }
+          add={() => setForm(true)}
+        />
+      )}
       <FilterBar
         query={query}
         setQuery={setQuery}
@@ -137,10 +142,17 @@ export default function Maintenance() {
           close={() => setForm(false)}
         />
       )}{" "}
-      {tab === "work" && <WorkTable rows={filteredRows} save={save} />}{" "}
+      {tab === "work" && (
+        <WorkTable rows={filteredRows} save={mayManage ? save : undefined} />
+      )}{" "}
       {tab === "compliance" && <ComplianceTable rows={filteredRows} />}{" "}
       {tab === "amc" && <AmcTable rows={filteredRows} />}{" "}
-      {tab === "disposal" && <DisposalTable rows={filteredRows} save={save} />}
+      {tab === "disposal" && (
+        <DisposalTable
+          rows={filteredRows}
+          save={mayApprove ? save : undefined}
+        />
+      )}
     </Shell>
   );
 }
@@ -412,7 +424,7 @@ function WorkTable({ rows, save }: any) {
             <span className="badge">{r.status}</span>
           </td>
           <td>
-            {r.status !== "COMPLETED" && (
+            {save && r.status !== "COMPLETED" && (
               <button
                 className="btn"
                 onClick={() =>
@@ -513,7 +525,7 @@ function DisposalTable({ rows, save }: any) {
           </td>
           <td>
             <div className="rowActions">
-              {r.status === "PROPOSED" && (
+              {save && r.status === "PROPOSED" && (
                 <>
                   <button
                     onClick={() =>
@@ -536,7 +548,7 @@ function DisposalTable({ rows, save }: any) {
                   </button>
                 </>
               )}
-              {r.status === "APPROVED" && (
+              {save && r.status === "APPROVED" && (
                 <button
                   onClick={() =>
                     save(`/maintenance/disposals/${r.id}/complete`, {

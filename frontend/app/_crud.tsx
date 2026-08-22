@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { FilterBar, filterRows } from "./_filters";
+import { Permission, usePermission } from "../lib/rbac";
 export type Field = {
   name: string;
   label: string;
@@ -15,6 +16,7 @@ export function Crud({
   fields,
   columns,
   onChanged,
+  managePermission,
 }: {
   title: string;
   endpoint: string;
@@ -25,7 +27,9 @@ export function Crud({
     render?: (row: any) => React.ReactNode;
   }[];
   onChanged?: () => void;
+  managePermission?: Permission;
 }) {
+  const mayManage = usePermission(managePermission || "masters.manage");
   const [rows, setRows] = useState<any[]>([]),
     [editing, setEditing] = useState<any>(null),
     [form, setForm] = useState<Record<string, any>>({}),
@@ -89,9 +93,11 @@ export function Crud({
     <section className="card section">
       <div className="sectionHead">
         <h3>{title}</h3>
-        <button className="btn" onClick={() => begin()}>
-          + Add
-        </button>
+        {mayManage && (
+          <button className="btn" onClick={() => begin()}>
+            + Add
+          </button>
+        )}
       </div>
       {error && <p className="error">{error}</p>}
       <FilterBar
@@ -155,7 +161,7 @@ export function Crud({
               {columns.map((c) => (
                 <th key={c.key}>{c.label}</th>
               ))}
-              <th>Actions</th>
+              {mayManage && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -166,19 +172,24 @@ export function Crud({
                     {c.render ? c.render(row) : row[c.key] || "—"}
                   </td>
                 ))}
-                <td>
-                  <div className="rowActions">
-                    <button onClick={() => begin(row)}>Edit</button>
-                    <button className="danger" onClick={() => remove(row)}>
-                      Delete
-                    </button>
-                  </div>
-                </td>
+                {mayManage && (
+                  <td>
+                    <div className="rowActions">
+                      <button onClick={() => begin(row)}>Edit</button>
+                      <button className="danger" onClick={() => remove(row)}>
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
             {!visibleRows.length && (
               <tr>
-                <td colSpan={columns.length + 1} className="empty">
+                <td
+                  colSpan={columns.length + (mayManage ? 1 : 0)}
+                  className="empty"
+                >
                   {rows.length
                     ? "No records match the current filters."
                     : "No records yet. Select Add to create one."}

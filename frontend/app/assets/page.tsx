@@ -5,6 +5,7 @@ import { api, download } from "../../lib/api";
 import { Shell } from "../_components";
 import { FilterBar, filterRows, unique } from "../_filters";
 import { downloadAssetTemplate, parseAssetCsv } from "./csv";
+import { usePermission } from "../../lib/rbac";
 const blank: any = {
   assetTag: "",
   serialNumber: "",
@@ -25,6 +26,9 @@ const blank: any = {
   custodianId: "",
 };
 export default function Assets() {
+  const mayManage = usePermission("assets.manage"),
+    mayDelete = usePermission("assets.delete"),
+    mayExport = usePermission("reports.view");
   const [rows, setRows] = useState<any[]>([]),
     [options, setOptions] = useState<any>(null),
     [q, setQ] = useState(""),
@@ -146,31 +150,39 @@ export default function Assets() {
           <button className="ghost" onClick={downloadAssetTemplate}>
             CSV template
           </button>
-          <button
-            className="ghost"
-            onClick={() =>
-              download("/reports/export/assets", "asset-register.csv")
-            }
-          >
-            Export CSV
-          </button>
-          <button
-            className="ghost"
-            disabled={importing}
-            onClick={() => fileInput.current?.click()}
-          >
-            {importing ? "Importing…" : "Import CSV"}
-          </button>
-          <input
-            ref={fileInput}
-            className="fileInput"
-            type="file"
-            accept=".csv,text/csv"
-            onChange={(event) => importCsv(event.target.files?.[0])}
-          />
-          <button className="btn" onClick={() => edit()}>
-            + Add asset
-          </button>
+          {mayExport && (
+            <button
+              className="ghost"
+              onClick={() =>
+                download("/reports/export/assets", "asset-register.csv")
+              }
+            >
+              Export CSV
+            </button>
+          )}
+          {mayManage && (
+            <button
+              className="ghost"
+              disabled={importing}
+              onClick={() => fileInput.current?.click()}
+            >
+              {importing ? "Importing…" : "Import CSV"}
+            </button>
+          )}
+          {mayManage && (
+            <input
+              ref={fileInput}
+              className="fileInput"
+              type="file"
+              accept=".csv,text/csv"
+              onChange={(event) => importCsv(event.target.files?.[0])}
+            />
+          )}
+          {mayManage && (
+            <button className="btn" onClick={() => edit()}>
+              + Add asset
+            </button>
+          )}
         </div>
       </div>
       <FilterBar
@@ -349,7 +361,7 @@ export default function Assets() {
               <th>Location</th>
               <th>Custodian</th>
               <th>Status</th>
-              <th>Actions</th>
+              {(mayManage || mayDelete) && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -384,27 +396,36 @@ export default function Assets() {
                 <td>
                   <span className="badge">{a.status}</span>
                 </td>
-                <td>
-                  <div className="rowActions">
-                    <Link
-                      className="viewIconButton"
-                      href={"/assets/" + a.id}
-                      aria-label={`View ${a.assetTag}`}
-                      title="View asset details"
-                    >
-                      <EyeIcon />
-                    </Link>
-                    <button onClick={() => edit(a)}>Edit</button>
-                    <button className="danger" onClick={() => remove(a)}>
-                      Delete
-                    </button>
-                  </div>
-                </td>
+                {(mayManage || mayDelete) && (
+                  <td>
+                    <div className="rowActions">
+                      <Link
+                        className="viewIconButton"
+                        href={"/assets/" + a.id}
+                        aria-label={`View ${a.assetTag}`}
+                        title="View asset details"
+                      >
+                        <EyeIcon />
+                      </Link>
+                      {mayManage && (
+                        <button onClick={() => edit(a)}>Edit</button>
+                      )}
+                      {mayDelete && (
+                        <button className="danger" onClick={() => remove(a)}>
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
             {!visibleRows.length && (
               <tr>
-                <td colSpan={9} className="empty">
+                <td
+                  colSpan={8 + (mayManage || mayDelete ? 1 : 0)}
+                  className="empty"
+                >
                   {rows.length
                     ? "No assets match the current filters."
                     : "No assets registered."}

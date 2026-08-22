@@ -1,22 +1,14 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
-import { auth, authorize, AuthRequest } from "../middleware/auth.js";
+import { auth, AuthRequest } from "../middleware/auth.js";
 import { audit } from "../audit.js";
 import { AppError } from "../middleware/errors.js";
+import { can, permit } from "../rbac.js";
 export const procurementRouter = Router();
-procurementRouter.use(auth);
-const procurement = authorize(
-  "SUPER_ADMIN",
-  "ORG_ADMIN",
-  "PROCUREMENT_OFFICER",
-);
-const approvers = authorize(
-  "SUPER_ADMIN",
-  "ORG_ADMIN",
-  "DEPARTMENT_HEAD",
-  "FINANCE",
-);
+procurementRouter.use(auth, permit("procurement.view"));
+const procurement = permit("procurement.manage");
+const approvers = permit("procurement.approve");
 const item = z.object({
   productId: z.string().cuid(),
   quantity: z.coerce.number().int().positive(),
@@ -65,7 +57,18 @@ procurementRouter.get("/options", async (req: AuthRequest, res) => {
 procurementRouter.get("/requisitions", async (req: AuthRequest, res) =>
   res.json(
     await prisma.purchaseRequisition.findMany({
-      where: { organizationId: req.user!.organizationId },
+      where: {
+        organizationId: req.user!.organizationId,
+        ...(req.user!.role === "EMPLOYEE"
+          ? { requestedByUserId: req.user!.id }
+          : req.user!.role === "DEPARTMENT_HEAD"
+            ? {
+                requestedBy: {
+                  departmentId: req.user!.departmentId || "__NO_DEPARTMENT__",
+                },
+              }
+            : {}),
+      },
       include: {
         requestedBy: { select: { name: true, email: true } },
         items: { include: { product: true } },
@@ -143,6 +146,11 @@ procurementRouter.post(
       before = await reqOwned(id, req);
     if (before.status !== "DRAFT")
       throw new AppError(400, "Only draft requisitions can be submitted");
+    if (
+      before.requestedByUserId !== req.user!.id &&
+      !can(req.user!.role, "procurement.manage")
+    )
+      throw new AppError(403, "You cannot submit this requisition");
     const template = await prisma.workflowTemplate.findFirst({
       where: {
         organizationId: req.user!.organizationId,
@@ -258,17 +266,19 @@ const rfq = z.object({
 });
 procurementRouter.get("/rfqs", async (req: AuthRequest, res) =>
   res.json(
-    await prisma.requestForQuotation.findMany({
-      where: { organizationId: req.user!.organizationId },
-      include: {
-        requisition: true,
-        quotations: {
-          include: { vendor: true },
-          orderBy: { quotedAmount: "asc" },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
+    ["EMPLOYEE", "DEPARTMENT_HEAD"].includes(req.user!.role)
+      ? []
+      : await prisma.requestForQuotation.findMany({
+          where: { organizationId: req.user!.organizationId },
+          include: {
+            requisition: true,
+            quotations: {
+              include: { vendor: true },
+              orderBy: { quotedAmount: "asc" },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        }),
   ),
 );
 procurementRouter.post("/rfqs", procurement, async (req: AuthRequest, res) => {
@@ -397,15 +407,17 @@ const poSchema = z.object({
 });
 procurementRouter.get("/purchase-orders", async (req: AuthRequest, res) =>
   res.json(
-    await prisma.purchaseOrder.findMany({
-      where: { organizationId: req.user!.organizationId },
-      include: {
-        vendor: true,
-        items: { include: { product: true } },
-        goodsReceipts: true,
-      },
-      orderBy: { poDate: "desc" },
-    }),
+    ["EMPLOYEE", "DEPARTMENT_HEAD"].includes(req.user!.role)
+      ? []
+      : await prisma.purchaseOrder.findMany({
+          where: { organizationId: req.user!.organizationId },
+          include: {
+            vendor: true,
+            items: { include: { product: true } },
+            goodsReceipts: true,
+          },
+          orderBy: { poDate: "desc" },
+        }),
   ),
 );
 procurementRouter.post(

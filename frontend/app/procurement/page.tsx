@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { Shell } from "../_components";
 import { FilterBar, filterRows, unique } from "../_filters";
+import { usePermission, useSession } from "../../lib/rbac";
 const emptyItem = {
   productId: "",
   quantity: 1,
@@ -10,6 +11,11 @@ const emptyItem = {
   remarks: "",
 };
 export default function Procurement() {
+  const user = useSession(),
+    mayManage = usePermission("procurement.manage"),
+    mayApprove = usePermission("procurement.approve"),
+    showCommercial =
+      !!user && !["EMPLOYEE", "DEPARTMENT_HEAD"].includes(user.role);
   const [tab, setTab] = useState("requisitions"),
     [reqs, setReqs] = useState<any[]>([]),
     [rfqs, setRfqs] = useState<any[]>([]),
@@ -73,20 +79,22 @@ export default function Procurement() {
           ["requisitions", "Requisitions"],
           ["rfqs", "RFQs & Quotations"],
           ["orders", "Purchase Orders"],
-        ].map(([k, v]) => (
-          <button
-            className={tab === k ? "active" : ""}
-            key={k}
-            onClick={() => {
-              setTab(k);
-              setForm(false);
-              setQuery("");
-              setStatus("");
-            }}
-          >
-            {v}
-          </button>
-        ))}
+        ]
+          .filter(([k]) => k === "requisitions" || showCommercial)
+          .map(([k, v]) => (
+            <button
+              className={tab === k ? "active" : ""}
+              key={k}
+              onClick={() => {
+                setTab(k);
+                setForm(false);
+                setQuery("");
+                setStatus("");
+              }}
+            >
+              {v}
+            </button>
+          ))}
       </div>
       {error && <p className="error">{error}</p>}
       <FilterBar
@@ -144,16 +152,17 @@ export default function Procurement() {
                     </td>
                     <td>
                       <div className="rowActions">
-                        {r.status === "DRAFT" && (
-                          <button
-                            onClick={() =>
-                              act(`/procurement/requisitions/${r.id}/submit`)
-                            }
-                          >
-                            Submit
-                          </button>
-                        )}
-                        {r.status === "PENDING_APPROVAL" && (
+                        {r.status === "DRAFT" &&
+                          (r.requestedByUserId === user?.id || mayManage) && (
+                            <button
+                              onClick={() =>
+                                act(`/procurement/requisitions/${r.id}/submit`)
+                              }
+                            >
+                              Submit
+                            </button>
+                          )}
+                        {mayApprove && r.status === "PENDING_APPROVAL" && (
                           <>
                             <button
                               onClick={() =>
@@ -189,15 +198,17 @@ export default function Procurement() {
       )}
       {tab === "rfqs" && (
         <>
-          <div className="dualHead">
-            <Head
-              title="RFQs and vendor comparison"
-              add={() => setForm("rfq" as any)}
-            />
-            <button className="ghost" onClick={() => setForm("quote" as any)}>
-              + Add quotation
-            </button>
-          </div>
+          {mayManage && (
+            <div className="dualHead">
+              <Head
+                title="RFQs and vendor comparison"
+                add={() => setForm("rfq" as any)}
+              />
+              <button className="ghost" onClick={() => setForm("quote" as any)}>
+                + Add quotation
+              </button>
+            </div>
+          )}
           {form === "rfq" && (
             <RfqForm
               requisitions={opts.requisitions}
@@ -250,16 +261,17 @@ export default function Procurement() {
                         <td>{q.deliveryDays ?? "—"} days</td>
                         <td>{q.status}</td>
                         <td>
-                          {!["AWARDED", "CANCELLED"].includes(r.status) && (
-                            <button
-                              className="btn"
-                              onClick={() =>
-                                act(`/procurement/quotations/${q.id}/select`)
-                              }
-                            >
-                              Select
-                            </button>
-                          )}
+                          {mayManage &&
+                            !["AWARDED", "CANCELLED"].includes(r.status) && (
+                              <button
+                                className="btn"
+                                onClick={() =>
+                                  act(`/procurement/quotations/${q.id}/select`)
+                                }
+                              >
+                                Select
+                              </button>
+                            )}
                         </td>
                       </tr>
                     ))}
@@ -279,7 +291,9 @@ export default function Procurement() {
       )}
       {tab === "orders" && (
         <>
-          <Head title="Purchase Orders" add={() => setForm(true)} />
+          {mayManage && (
+            <Head title="Purchase Orders" add={() => setForm(true)} />
+          )}
           {form && (
             <PoForm
               products={opts.products}
@@ -318,7 +332,7 @@ export default function Procurement() {
                       <span className="badge">{po.status}</span>
                     </td>
                     <td>
-                      {po.status === "DRAFT" && (
+                      {mayApprove && po.status === "DRAFT" && (
                         <div className="rowActions">
                           <button
                             onClick={() =>

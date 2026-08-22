@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { Shell } from "../_components";
 import { FilterBar, filterRows, unique } from "../_filters";
+import { usePermission } from "../../lib/rbac";
 const roles = [
   "ORG_ADMIN",
   "DEPARTMENT_HEAD",
@@ -14,6 +15,9 @@ const roles = [
   "AUDITOR",
 ];
 export default function Governance() {
+  const mayAudit = usePermission("audit.view"),
+    mayManageWorkflows = usePermission("workflows.manage"),
+    mayScan = usePermission("maintenance.manage");
   const [tab, setTab] = useState("notifications"),
     [notifications, setNotifications] = useState<any[]>([]),
     [logs, setLogs] = useState<any[]>([]),
@@ -43,7 +47,7 @@ export default function Governance() {
     try {
       const [n, a, w] = await Promise.all([
         api("/governance/notifications"),
-        api("/governance/audit"),
+        mayAudit ? api("/governance/audit") : Promise.resolve([]),
         api("/governance/workflows"),
       ]);
       setNotifications(n);
@@ -54,8 +58,8 @@ export default function Governance() {
     }
   }
   useEffect(() => {
-    load();
-  }, []);
+    if (mayAudit !== undefined) load();
+  }, [mayAudit]);
   async function act(path: string, body?: any, method = "POST") {
     try {
       await api(path, {
@@ -75,20 +79,22 @@ export default function Governance() {
           ["notifications", "Notifications"],
           ["audit", "Audit Trail"],
           ["workflows", "Workflow Templates"],
-        ].map(([k, v]) => (
-          <button
-            key={k}
-            className={tab === k ? "active" : ""}
-            onClick={() => {
-              setTab(k);
-              setForm(false);
-              setQ("");
-              setStatus("");
-            }}
-          >
-            {v}
-          </button>
-        ))}
+        ]
+          .filter(([k]) => k !== "audit" || mayAudit)
+          .map(([k, v]) => (
+            <button
+              key={k}
+              className={tab === k ? "active" : ""}
+              onClick={() => {
+                setTab(k);
+                setForm(false);
+                setQ("");
+                setStatus("");
+              }}
+            >
+              {v}
+            </button>
+          ))}
       </div>
       {error && <p className="error">{error}</p>}
       <FilterBar
@@ -110,12 +116,14 @@ export default function Governance() {
                 {notifications.filter((n) => !n.readAt).length} unread
               </span>
             </div>
-            <button
-              className="btn"
-              onClick={() => act("/governance/notifications/scan")}
-            >
-              Scan due dates
-            </button>
+            {mayScan && (
+              <button
+                className="btn"
+                onClick={() => act("/governance/notifications/scan")}
+              >
+                Scan due dates
+              </button>
+            )}
           </div>
           <div className="noticeList">
             {filteredRows.map((n: any) => (
@@ -196,9 +204,11 @@ export default function Governance() {
         <>
           <div className="sectionHead section">
             <h3>Configurable approval chains</h3>
-            <button className="btn" onClick={() => setForm(true)}>
-              + Template
-            </button>
+            {mayManageWorkflows && (
+              <button className="btn" onClick={() => setForm(true)}>
+                + Template
+              </button>
+            )}
           </div>
           {form && (
             <WorkflowForm
@@ -216,15 +226,21 @@ export default function Governance() {
                       {w.entityType} · {w.active ? "Active" : "Inactive"}
                     </span>
                   </div>
-                  <button
-                    className="dangerLink"
-                    onClick={() =>
-                      confirm("Delete workflow?") &&
-                      act("/governance/workflows/" + w.id, undefined, "DELETE")
-                    }
-                  >
-                    Delete
-                  </button>
+                  {mayManageWorkflows && (
+                    <button
+                      className="dangerLink"
+                      onClick={() =>
+                        confirm("Delete workflow?") &&
+                        act(
+                          "/governance/workflows/" + w.id,
+                          undefined,
+                          "DELETE",
+                        )
+                      }
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
                 <p>{w.description}</p>
                 <ol className="steps">

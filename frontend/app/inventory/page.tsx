@@ -3,7 +3,9 @@ import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { Shell } from "../_components";
 import { FilterBar, filterRows, unique } from "../_filters";
+import { usePermission } from "../../lib/rbac";
 export default function Inventory() {
+  const mayManage = usePermission("inventory.manage");
   const [tab, setTab] = useState("stock"),
     [data, setData] = useState<any>({
       warehouses: [],
@@ -111,10 +113,12 @@ export default function Inventory() {
       {tab === "stock" && <Stock batches={filteredRows} />}{" "}
       {tab === "grn" && (
         <>
-          <Bar
-            title="Goods Receipt & Inspection"
-            action={() => setForm("grn")}
-          />
+          {mayManage && (
+            <Bar
+              title="Goods Receipt & Inspection"
+              action={() => setForm("grn")}
+            />
+          )}
           {form === "grn" && (
             <GrnForm
               options={data.options}
@@ -124,17 +128,19 @@ export default function Inventory() {
           )}
           <Grns
             rows={filteredRows}
-            inspect={(g: any) => setForm(g.id)}
-            save={save}
+            inspect={mayManage ? (g: any) => setForm(g.id) : undefined}
+            save={mayManage ? save : undefined}
           />
         </>
       )}
       {tab === "notes" && (
         <>
-          <Bar
-            title="Material Issue & Return Notes"
-            action={() => setForm("note")}
-          />
+          {mayManage && (
+            <Bar
+              title="Material Issue & Return Notes"
+              action={() => setForm("note")}
+            />
+          )}
           {form === "note" && (
             <NoteForm
               options={data.options}
@@ -144,16 +150,22 @@ export default function Inventory() {
           )}
           <Notes
             rows={filteredRows}
-            post={(id: string) => save("/inventory/notes/" + id + "/post", {})}
+            post={
+              mayManage
+                ? (id: string) => save("/inventory/notes/" + id + "/post", {})
+                : undefined
+            }
           />
         </>
       )}
       {tab === "warehouses" && (
         <>
-          <Bar
-            title="Warehouses and Bins"
-            action={() => setForm("warehouse")}
-          />
+          {mayManage && (
+            <Bar
+              title="Warehouses and Bins"
+              action={() => setForm("warehouse")}
+            />
+          )}
           {form === "warehouse" && (
             <WarehouseForm
               locations={data.locations}
@@ -163,12 +175,19 @@ export default function Inventory() {
           )}
           <Warehouses
             rows={filteredRows}
-            addBin={async (id: string) => {
-              const name = prompt("Bin name");
-              const code = prompt("Bin code");
-              if (name && code)
-                await save(`/inventory/warehouses/${id}/bins`, { name, code });
-            }}
+            addBin={
+              mayManage
+                ? async (id: string) => {
+                    const name = prompt("Bin name");
+                    const code = prompt("Bin code");
+                    if (name && code)
+                      await save(`/inventory/warehouses/${id}/bins`, {
+                        name,
+                        code,
+                      });
+                  }
+                : undefined
+            }
           />
         </>
       )}
@@ -537,7 +556,7 @@ function Grns({ rows, inspect, save }: any) {
                 <span className="badge">{g.status}</span>
               </td>
               <td>
-                {g.status === "INSPECTION_PENDING" && (
+                {g.status === "INSPECTION_PENDING" && save && (
                   <div className="rowActions">
                     <button
                       onClick={() =>
@@ -617,7 +636,7 @@ function Notes({ rows, post }: any) {
                 <span className="badge">{n.status}</span>
               </td>
               <td>
-                {n.status === "DRAFT" && (
+                {n.status === "DRAFT" && post && (
                   <button className="btn" onClick={() => post(n.id)}>
                     Post
                   </button>
@@ -658,9 +677,11 @@ function Warehouses({ rows, addBin }: any) {
                 ))}
               </td>
               <td>
-                <button className="ghost" onClick={() => addBin(w.id)}>
-                  + Bin
-                </button>
+                {addBin && (
+                  <button className="ghost" onClick={() => addBin(w.id)}>
+                    + Bin
+                  </button>
+                )}
               </td>
             </tr>
           ))}

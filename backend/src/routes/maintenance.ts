@@ -1,23 +1,373 @@
-import {Router} from 'express';import {z} from 'zod';import {prisma} from '../db.js';import {auth,authorize,AuthRequest} from '../middleware/auth.js';import {audit} from '../audit.js';import {AppError} from '../middleware/errors.js';
-export const maintenanceRouter=Router();maintenanceRouter.use(auth);const maintain=authorize('SUPER_ADMIN','ORG_ADMIN','ASSET_MANAGER','MAINTENANCE');const approve=authorize('SUPER_ADMIN','ORG_ADMIN','ASSET_MANAGER','FINANCE');
-maintenanceRouter.get('/options',async(req:AuthRequest,res)=>{const org=req.user!.organizationId;const [assets,contracts]=await Promise.all([prisma.asset.findMany({where:{organizationId:org,status:{not:'DISPOSED'}},select:{id:true,assetTag:true,product:{select:{name:true}}},orderBy:{assetTag:'asc'}}),prisma.aMCContract.findMany({where:{organizationId:org},orderBy:{endDate:'desc'}})]);res.json({assets,contracts})});
-const maintenance=z.object({assetId:z.string().cuid(),ticketNumber:z.string().trim().optional(),type:z.string().trim().min(2),description:z.string().trim().min(3),priority:z.enum(['LOW','MEDIUM','HIGH','CRITICAL']).default('MEDIUM'),vendorName:z.string().trim().optional(),cost:z.preprocess(v=>v===''?null:v,z.coerce.number().nonnegative().nullable().optional()),startedAt:z.coerce.date(),completedAt:z.preprocess(v=>v===''?null:v,z.coerce.date().nullable().optional()),nextDueDate:z.preprocess(v=>v===''?null:v,z.coerce.date().nullable().optional()),amcContractId:z.preprocess(v=>v===''?null:v,z.string().cuid().nullable().optional()),status:z.enum(['OPEN','IN_PROGRESS','COMPLETED','CANCELLED']).default('OPEN')});
-maintenanceRouter.get('/records',async(req:AuthRequest,res)=>res.json(await prisma.maintenanceRecord.findMany({where:{asset:{organizationId:req.user!.organizationId}},include:{asset:{include:{product:true}},amcContract:true},orderBy:{startedAt:'desc'}})));
-maintenanceRouter.post('/records',maintain,async(req:AuthRequest,res)=>{const d=maintenance.parse(req.body),org=req.user!.organizationId;await assetOwned(d.assetId,req);if(d.amcContractId&&!await prisma.aMCContract.findFirst({where:{id:d.amcContractId,organizationId:org}}))throw new AppError(400,'AMC contract does not belong to your organization');const row=await prisma.$transaction(async tx=>{const created=await tx.maintenanceRecord.create({data:d});if(d.status!=='COMPLETED')await tx.asset.update({where:{id:d.assetId},data:{status:'UNDER_MAINTENANCE'}});return created});await audit(req,'CREATE','MaintenanceRecord',row.id,undefined,row);res.status(201).json(row)});
-maintenanceRouter.put('/records/:id',maintain,async(req:AuthRequest,res)=>{const id=String(req.params.id),before=await prisma.maintenanceRecord.findFirst({where:{id,asset:{organizationId:req.user!.organizationId}}});if(!before)throw new AppError(404,'Maintenance record not found');const d=maintenance.parse(req.body);await assetOwned(d.assetId,req);const row=await prisma.$transaction(async tx=>{const updated=await tx.maintenanceRecord.update({where:{id},data:{...d,completedAt:d.status==='COMPLETED'?(d.completedAt||new Date()):d.completedAt}});await tx.asset.update({where:{id:d.assetId},data:{status:d.status==='COMPLETED'?'IN_USE':'UNDER_MAINTENANCE'}});return updated});await audit(req,'UPDATE','MaintenanceRecord',id,before,row);res.json(row)});
-const amc=z.object({contractNumber:z.string().trim().min(2),providerName:z.string().trim().min(2),startDate:z.coerce.date(),endDate:z.coerce.date(),amount:z.preprocess(v=>v===''?null:v,z.coerce.number().nonnegative().nullable().optional()),scope:z.string().max(2000).optional()});
-maintenanceRouter.get('/contracts',async(req:AuthRequest,res)=>res.json(await prisma.aMCContract.findMany({where:{organizationId:req.user!.organizationId},orderBy:{endDate:'desc'}})));
-maintenanceRouter.post('/contracts',maintain,async(req:AuthRequest,res)=>{const d=amc.parse(req.body);if(d.endDate<d.startDate)throw new AppError(400,'End date must be after start date');const row=await prisma.aMCContract.create({data:{...d,organizationId:req.user!.organizationId}});await audit(req,'CREATE','AMCContract',row.id,undefined,row);res.status(201).json(row)});
-maintenanceRouter.put('/contracts/:id',maintain,async(req:AuthRequest,res)=>{const id=String(req.params.id),before=await prisma.aMCContract.findFirst({where:{id,organizationId:req.user!.organizationId}});if(!before)throw new AppError(404,'Contract not found');const d=amc.parse(req.body);const row=await prisma.aMCContract.update({where:{id},data:d});await audit(req,'UPDATE','AMCContract',id,before,row);res.json(row)});
-maintenanceRouter.delete('/contracts/:id',maintain,async(req:AuthRequest,res)=>{const id=String(req.params.id),before=await prisma.aMCContract.findFirst({where:{id,organizationId:req.user!.organizationId}});if(!before)throw new AppError(404,'Contract not found');await prisma.aMCContract.delete({where:{id}});await audit(req,'DELETE','AMCContract',id,before);res.status(204).end()});
-const compliance=z.object({assetId:z.string().cuid(),type:z.enum(['WARRANTY','INSURANCE','CALIBRATION','LICENSE','CERTIFICATION']),referenceNumber:z.string().trim().optional(),providerName:z.string().trim().optional(),startDate:z.preprocess(v=>v===''?null:v,z.coerce.date().nullable().optional()),dueDate:z.coerce.date(),completedDate:z.preprocess(v=>v===''?null:v,z.coerce.date().nullable().optional()),notes:z.string().max(1000).optional()});
-maintenanceRouter.get('/compliance',async(req:AuthRequest,res)=>res.json(await prisma.complianceRecord.findMany({where:{organizationId:req.user!.organizationId},include:{asset:{include:{product:true}}},orderBy:{dueDate:'asc'}})));
-maintenanceRouter.post('/compliance',maintain,async(req:AuthRequest,res)=>{const d=compliance.parse(req.body);await assetOwned(d.assetId,req);const row=await prisma.complianceRecord.create({data:{...d,organizationId:req.user!.organizationId}});await audit(req,'CREATE','ComplianceRecord',row.id,undefined,row);res.status(201).json(row)});
-maintenanceRouter.put('/compliance/:id',maintain,async(req:AuthRequest,res)=>{const id=String(req.params.id),before=await prisma.complianceRecord.findFirst({where:{id,organizationId:req.user!.organizationId}});if(!before)throw new AppError(404,'Compliance record not found');const d=compliance.parse(req.body);await assetOwned(d.assetId,req);const row=await prisma.complianceRecord.update({where:{id},data:d});await audit(req,'UPDATE','ComplianceRecord',id,before,row);res.json(row)});
-maintenanceRouter.delete('/compliance/:id',maintain,async(req:AuthRequest,res)=>{const id=String(req.params.id),before=await prisma.complianceRecord.findFirst({where:{id,organizationId:req.user!.organizationId}});if(!before)throw new AppError(404,'Compliance record not found');await prisma.complianceRecord.delete({where:{id}});await audit(req,'DELETE','ComplianceRecord',id,before);res.status(204).end()});
-const disposal=z.object({assetId:z.string().cuid(),method:z.string().trim().min(2),reason:z.string().trim().min(3),proposedValue:z.preprocess(v=>v===''?null:v,z.coerce.number().nonnegative().nullable().optional())});
-maintenanceRouter.get('/disposals',async(req:AuthRequest,res)=>res.json(await prisma.disposalRecord.findMany({where:{organizationId:req.user!.organizationId},include:{asset:{include:{product:true}}},orderBy:{proposedAt:'desc'}})));
-maintenanceRouter.post('/disposals',maintain,async(req:AuthRequest,res)=>{const d=disposal.parse(req.body);const asset=await assetOwned(d.assetId,req);if(asset.status==='DISPOSED')throw new AppError(400,'Asset is already disposed');const row=await prisma.disposalRecord.create({data:{...d,organizationId:req.user!.organizationId}});await audit(req,'PROPOSE','DisposalRecord',row.id,undefined,row);res.status(201).json(row)});
-maintenanceRouter.post('/disposals/:id/decision',approve,async(req:AuthRequest,res)=>{const id=String(req.params.id),before=await prisma.disposalRecord.findFirst({where:{id,organizationId:req.user!.organizationId}});if(!before)throw new AppError(404,'Disposal record not found');const d=z.object({decision:z.enum(['APPROVED','REJECTED'])}).parse(req.body);if(before.status!=='PROPOSED')throw new AppError(400,'Disposal is not pending a decision');const row=await prisma.disposalRecord.update({where:{id},data:{status:d.decision,approvedAt:d.decision==='APPROVED'?new Date():null}});await audit(req,d.decision,'DisposalRecord',id,before,row);res.json(row)});
-maintenanceRouter.post('/disposals/:id/complete',approve,async(req:AuthRequest,res)=>{const id=String(req.params.id),before=await prisma.disposalRecord.findFirst({where:{id,organizationId:req.user!.organizationId},include:{asset:true}});if(!before)throw new AppError(404,'Disposal record not found');if(before.status!=='APPROVED')throw new AppError(400,'Disposal must be approved first');const {realizedValue}=z.object({realizedValue:z.coerce.number().nonnegative().optional()}).parse(req.body);const row=await prisma.$transaction(async tx=>{await tx.assetMovement.create({data:{assetId:before.assetId,type:'DISPOSAL',fromLocationId:before.asset.currentLocationId,movedByUserId:req.user!.id,remarks:`Disposed by ${before.method}: ${before.reason}`}});await tx.asset.update({where:{id:before.assetId},data:{status:'DISPOSED',currentLocationId:null,custodianId:null}});await tx.assetAssignment.updateMany({where:{assetId:before.assetId,returnedAt:null},data:{returnedAt:new Date()}});return tx.disposalRecord.update({where:{id},data:{status:'COMPLETED',completedAt:new Date(),realizedValue}})});await audit(req,'COMPLETE','DisposalRecord',id,before,row);res.json(row)});
-async function assetOwned(id:string,req:AuthRequest){const row=await prisma.asset.findFirst({where:{id,organizationId:req.user!.organizationId}});if(!row)throw new AppError(404,'Asset not found');return row}
+import { Router } from "express";
+import { z } from "zod";
+import { prisma } from "../db.js";
+import { auth, AuthRequest } from "../middleware/auth.js";
+import { audit } from "../audit.js";
+import { AppError } from "../middleware/errors.js";
+import { permit } from "../rbac.js";
+export const maintenanceRouter = Router();
+maintenanceRouter.use(auth, permit("maintenance.view"));
+const maintain = permit("maintenance.manage");
+const approve = permit("maintenance.approve");
+maintenanceRouter.get("/options", async (req: AuthRequest, res) => {
+  const org = req.user!.organizationId;
+  const [assets, contracts] = await Promise.all([
+    prisma.asset.findMany({
+      where: { organizationId: org, status: { not: "DISPOSED" } },
+      select: { id: true, assetTag: true, product: { select: { name: true } } },
+      orderBy: { assetTag: "asc" },
+    }),
+    prisma.aMCContract.findMany({
+      where: { organizationId: org },
+      orderBy: { endDate: "desc" },
+    }),
+  ]);
+  res.json({ assets, contracts });
+});
+const maintenance = z.object({
+  assetId: z.string().cuid(),
+  ticketNumber: z.string().trim().optional(),
+  type: z.string().trim().min(2),
+  description: z.string().trim().min(3),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).default("MEDIUM"),
+  vendorName: z.string().trim().optional(),
+  cost: z.preprocess(
+    (v) => (v === "" ? null : v),
+    z.coerce.number().nonnegative().nullable().optional(),
+  ),
+  startedAt: z.coerce.date(),
+  completedAt: z.preprocess(
+    (v) => (v === "" ? null : v),
+    z.coerce.date().nullable().optional(),
+  ),
+  nextDueDate: z.preprocess(
+    (v) => (v === "" ? null : v),
+    z.coerce.date().nullable().optional(),
+  ),
+  amcContractId: z.preprocess(
+    (v) => (v === "" ? null : v),
+    z.string().cuid().nullable().optional(),
+  ),
+  status: z
+    .enum(["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
+    .default("OPEN"),
+});
+maintenanceRouter.get("/records", async (req: AuthRequest, res) =>
+  res.json(
+    await prisma.maintenanceRecord.findMany({
+      where: { asset: { organizationId: req.user!.organizationId } },
+      include: { asset: { include: { product: true } }, amcContract: true },
+      orderBy: { startedAt: "desc" },
+    }),
+  ),
+);
+maintenanceRouter.post("/records", maintain, async (req: AuthRequest, res) => {
+  const d = maintenance.parse(req.body),
+    org = req.user!.organizationId;
+  await assetOwned(d.assetId, req);
+  if (
+    d.amcContractId &&
+    !(await prisma.aMCContract.findFirst({
+      where: { id: d.amcContractId, organizationId: org },
+    }))
+  )
+    throw new AppError(
+      400,
+      "AMC contract does not belong to your organization",
+    );
+  const row = await prisma.$transaction(async (tx) => {
+    const created = await tx.maintenanceRecord.create({ data: d });
+    if (d.status !== "COMPLETED")
+      await tx.asset.update({
+        where: { id: d.assetId },
+        data: { status: "UNDER_MAINTENANCE" },
+      });
+    return created;
+  });
+  await audit(req, "CREATE", "MaintenanceRecord", row.id, undefined, row);
+  res.status(201).json(row);
+});
+maintenanceRouter.put(
+  "/records/:id",
+  maintain,
+  async (req: AuthRequest, res) => {
+    const id = String(req.params.id),
+      before = await prisma.maintenanceRecord.findFirst({
+        where: { id, asset: { organizationId: req.user!.organizationId } },
+      });
+    if (!before) throw new AppError(404, "Maintenance record not found");
+    const d = maintenance.parse(req.body);
+    await assetOwned(d.assetId, req);
+    const row = await prisma.$transaction(async (tx) => {
+      const updated = await tx.maintenanceRecord.update({
+        where: { id },
+        data: {
+          ...d,
+          completedAt:
+            d.status === "COMPLETED"
+              ? d.completedAt || new Date()
+              : d.completedAt,
+        },
+      });
+      await tx.asset.update({
+        where: { id: d.assetId },
+        data: {
+          status: d.status === "COMPLETED" ? "IN_USE" : "UNDER_MAINTENANCE",
+        },
+      });
+      return updated;
+    });
+    await audit(req, "UPDATE", "MaintenanceRecord", id, before, row);
+    res.json(row);
+  },
+);
+const amc = z.object({
+  contractNumber: z.string().trim().min(2),
+  providerName: z.string().trim().min(2),
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date(),
+  amount: z.preprocess(
+    (v) => (v === "" ? null : v),
+    z.coerce.number().nonnegative().nullable().optional(),
+  ),
+  scope: z.string().max(2000).optional(),
+});
+maintenanceRouter.get("/contracts", async (req: AuthRequest, res) =>
+  res.json(
+    await prisma.aMCContract.findMany({
+      where: { organizationId: req.user!.organizationId },
+      orderBy: { endDate: "desc" },
+    }),
+  ),
+);
+maintenanceRouter.post(
+  "/contracts",
+  maintain,
+  async (req: AuthRequest, res) => {
+    const d = amc.parse(req.body);
+    if (d.endDate < d.startDate)
+      throw new AppError(400, "End date must be after start date");
+    const row = await prisma.aMCContract.create({
+      data: { ...d, organizationId: req.user!.organizationId },
+    });
+    await audit(req, "CREATE", "AMCContract", row.id, undefined, row);
+    res.status(201).json(row);
+  },
+);
+maintenanceRouter.put(
+  "/contracts/:id",
+  maintain,
+  async (req: AuthRequest, res) => {
+    const id = String(req.params.id),
+      before = await prisma.aMCContract.findFirst({
+        where: { id, organizationId: req.user!.organizationId },
+      });
+    if (!before) throw new AppError(404, "Contract not found");
+    const d = amc.parse(req.body);
+    const row = await prisma.aMCContract.update({ where: { id }, data: d });
+    await audit(req, "UPDATE", "AMCContract", id, before, row);
+    res.json(row);
+  },
+);
+maintenanceRouter.delete(
+  "/contracts/:id",
+  maintain,
+  async (req: AuthRequest, res) => {
+    const id = String(req.params.id),
+      before = await prisma.aMCContract.findFirst({
+        where: { id, organizationId: req.user!.organizationId },
+      });
+    if (!before) throw new AppError(404, "Contract not found");
+    await prisma.aMCContract.delete({ where: { id } });
+    await audit(req, "DELETE", "AMCContract", id, before);
+    res.status(204).end();
+  },
+);
+const compliance = z.object({
+  assetId: z.string().cuid(),
+  type: z.enum([
+    "WARRANTY",
+    "INSURANCE",
+    "CALIBRATION",
+    "LICENSE",
+    "CERTIFICATION",
+  ]),
+  referenceNumber: z.string().trim().optional(),
+  providerName: z.string().trim().optional(),
+  startDate: z.preprocess(
+    (v) => (v === "" ? null : v),
+    z.coerce.date().nullable().optional(),
+  ),
+  dueDate: z.coerce.date(),
+  completedDate: z.preprocess(
+    (v) => (v === "" ? null : v),
+    z.coerce.date().nullable().optional(),
+  ),
+  notes: z.string().max(1000).optional(),
+});
+maintenanceRouter.get("/compliance", async (req: AuthRequest, res) =>
+  res.json(
+    await prisma.complianceRecord.findMany({
+      where: { organizationId: req.user!.organizationId },
+      include: { asset: { include: { product: true } } },
+      orderBy: { dueDate: "asc" },
+    }),
+  ),
+);
+maintenanceRouter.post(
+  "/compliance",
+  maintain,
+  async (req: AuthRequest, res) => {
+    const d = compliance.parse(req.body);
+    await assetOwned(d.assetId, req);
+    const row = await prisma.complianceRecord.create({
+      data: { ...d, organizationId: req.user!.organizationId },
+    });
+    await audit(req, "CREATE", "ComplianceRecord", row.id, undefined, row);
+    res.status(201).json(row);
+  },
+);
+maintenanceRouter.put(
+  "/compliance/:id",
+  maintain,
+  async (req: AuthRequest, res) => {
+    const id = String(req.params.id),
+      before = await prisma.complianceRecord.findFirst({
+        where: { id, organizationId: req.user!.organizationId },
+      });
+    if (!before) throw new AppError(404, "Compliance record not found");
+    const d = compliance.parse(req.body);
+    await assetOwned(d.assetId, req);
+    const row = await prisma.complianceRecord.update({
+      where: { id },
+      data: d,
+    });
+    await audit(req, "UPDATE", "ComplianceRecord", id, before, row);
+    res.json(row);
+  },
+);
+maintenanceRouter.delete(
+  "/compliance/:id",
+  maintain,
+  async (req: AuthRequest, res) => {
+    const id = String(req.params.id),
+      before = await prisma.complianceRecord.findFirst({
+        where: { id, organizationId: req.user!.organizationId },
+      });
+    if (!before) throw new AppError(404, "Compliance record not found");
+    await prisma.complianceRecord.delete({ where: { id } });
+    await audit(req, "DELETE", "ComplianceRecord", id, before);
+    res.status(204).end();
+  },
+);
+const disposal = z.object({
+  assetId: z.string().cuid(),
+  method: z.string().trim().min(2),
+  reason: z.string().trim().min(3),
+  proposedValue: z.preprocess(
+    (v) => (v === "" ? null : v),
+    z.coerce.number().nonnegative().nullable().optional(),
+  ),
+});
+maintenanceRouter.get("/disposals", async (req: AuthRequest, res) =>
+  res.json(
+    await prisma.disposalRecord.findMany({
+      where: { organizationId: req.user!.organizationId },
+      include: { asset: { include: { product: true } } },
+      orderBy: { proposedAt: "desc" },
+    }),
+  ),
+);
+maintenanceRouter.post(
+  "/disposals",
+  maintain,
+  async (req: AuthRequest, res) => {
+    const d = disposal.parse(req.body);
+    const asset = await assetOwned(d.assetId, req);
+    if (asset.status === "DISPOSED")
+      throw new AppError(400, "Asset is already disposed");
+    const row = await prisma.disposalRecord.create({
+      data: { ...d, organizationId: req.user!.organizationId },
+    });
+    await audit(req, "PROPOSE", "DisposalRecord", row.id, undefined, row);
+    res.status(201).json(row);
+  },
+);
+maintenanceRouter.post(
+  "/disposals/:id/decision",
+  approve,
+  async (req: AuthRequest, res) => {
+    const id = String(req.params.id),
+      before = await prisma.disposalRecord.findFirst({
+        where: { id, organizationId: req.user!.organizationId },
+      });
+    if (!before) throw new AppError(404, "Disposal record not found");
+    const d = z
+      .object({ decision: z.enum(["APPROVED", "REJECTED"]) })
+      .parse(req.body);
+    if (before.status !== "PROPOSED")
+      throw new AppError(400, "Disposal is not pending a decision");
+    const row = await prisma.disposalRecord.update({
+      where: { id },
+      data: {
+        status: d.decision,
+        approvedAt: d.decision === "APPROVED" ? new Date() : null,
+      },
+    });
+    await audit(req, d.decision, "DisposalRecord", id, before, row);
+    res.json(row);
+  },
+);
+maintenanceRouter.post(
+  "/disposals/:id/complete",
+  approve,
+  async (req: AuthRequest, res) => {
+    const id = String(req.params.id),
+      before = await prisma.disposalRecord.findFirst({
+        where: { id, organizationId: req.user!.organizationId },
+        include: { asset: true },
+      });
+    if (!before) throw new AppError(404, "Disposal record not found");
+    if (before.status !== "APPROVED")
+      throw new AppError(400, "Disposal must be approved first");
+    const { realizedValue } = z
+      .object({ realizedValue: z.coerce.number().nonnegative().optional() })
+      .parse(req.body);
+    const row = await prisma.$transaction(async (tx) => {
+      await tx.assetMovement.create({
+        data: {
+          assetId: before.assetId,
+          type: "DISPOSAL",
+          fromLocationId: before.asset.currentLocationId,
+          movedByUserId: req.user!.id,
+          remarks: `Disposed by ${before.method}: ${before.reason}`,
+        },
+      });
+      await tx.asset.update({
+        where: { id: before.assetId },
+        data: {
+          status: "DISPOSED",
+          currentLocationId: null,
+          custodianId: null,
+        },
+      });
+      await tx.assetAssignment.updateMany({
+        where: { assetId: before.assetId, returnedAt: null },
+        data: { returnedAt: new Date() },
+      });
+      return tx.disposalRecord.update({
+        where: { id },
+        data: { status: "COMPLETED", completedAt: new Date(), realizedValue },
+      });
+    });
+    await audit(req, "COMPLETE", "DisposalRecord", id, before, row);
+    res.json(row);
+  },
+);
+async function assetOwned(id: string, req: AuthRequest) {
+  const row = await prisma.asset.findFirst({
+    where: { id, organizationId: req.user!.organizationId },
+  });
+  if (!row) throw new AppError(404, "Asset not found");
+  return row;
+}

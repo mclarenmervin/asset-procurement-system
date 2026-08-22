@@ -15,6 +15,7 @@ AssetFlow Enterprise is a full-stack asset, procurement and material-management 
 - Dashboard analytics and authenticated CSV exports for assets, movements, procurement, stock, maintenance and verification
 - Consistent live search and contextual status/type filters across registers, workflows, histories, audit data and reports
 - JWT authentication, signup, role permissions, tenant isolation and request validation
+- Centralized role-based access control with role-aware navigation, action visibility, live role refresh and department-scoped employee data
 - Security headers, strict origin allowlist, API/login rate limits, compression, request IDs and database readiness checks
 
 ## Technology
@@ -66,6 +67,24 @@ Demo administrator (local seed only):
 - Password: `Admin@123`
 
 Change the demo credentials and JWT secret before any shared deployment.
+
+## Role-based access
+
+Permissions are enforced by the API and reflected in the web interface. `SUPER_ADMIN` and `ORG_ADMIN` have full access; organization administrators cannot grant or modify the global super-administrator role.
+
+| Role                               | Primary access                                                                           |
+| ---------------------------------- | ---------------------------------------------------------------------------------------- |
+| Super / organization administrator | All organization modules, users, roles and workflows                                     |
+| Asset manager                      | Assets, movements, documents, maintenance, verification, locations and asset master data |
+| Procurement officer                | Vendors, requisitions, RFQs, quotations, purchase orders and related master data         |
+| Store manager                      | Assets, stores, receipts, stock notes, verification and locations                        |
+| Department head                    | Department-scoped assets and requisitions, plus assigned approvals                       |
+| Maintenance                        | Asset movement/documents and maintenance operations                                      |
+| Finance                            | Procurement and disposal approvals, inventory visibility and reports                     |
+| Auditor                            | Read-only operational modules, audit trail, reports and physical verification            |
+| Employee                           | Own/department assets, own requisitions and locations                                    |
+
+The backend refreshes the user's current role from the database on every authenticated request, so access changes take effect immediately. Employees and department heads receive department-scoped asset and requisition data.
 
 ## Environment variables
 

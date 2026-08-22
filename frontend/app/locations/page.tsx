@@ -1,2 +1,45 @@
-'use client'; import {useEffect,useState} from 'react'; import {Shell} from '../_components'; import {Crud} from '../_crud'; import {api} from '../../lib/api';
-export default function Locations(){const [locations,setLocations]=useState<any[]>([]);async function load(){setLocations(await api('/locations'))}useEffect(()=>{load()},[]);return <Shell title="Locations & Facilities"><Crud title="Location hierarchy" endpoint="/locations" onChanged={load} fields={[{name:'name',label:'Location name',required:true},{name:'code',label:'Code',required:true},{name:'type',label:'Type',required:true},{name:'parentId',label:'Parent location',type:'select',options:locations.map(x=>({value:x.id,label:x.name}))}]} columns={[{key:'code',label:'Code'},{key:'name',label:'Location'},{key:'type',label:'Type'},{key:'parent',label:'Parent',render:r=>r.parent?.name||'Root'}]}/></Shell>}
+"use client";
+import { useEffect, useState } from "react";
+import { Shell } from "../_components";
+import { Crud } from "../_crud";
+import { api } from "../../lib/api";
+export default function Locations() {
+  const [locations, setLocations] = useState<any[]>([]);
+  async function load() {
+    setLocations(await api("/locations"));
+  }
+  useEffect(() => {
+    load();
+  }, []);
+  return (
+    <Shell title="Locations & Facilities">
+      <Crud
+        title="Location hierarchy"
+        endpoint="/locations"
+        managePermission="locations.manage"
+        onChanged={load}
+        fields={[
+          { name: "name", label: "Location name", required: true },
+          { name: "code", label: "Code", required: true },
+          { name: "type", label: "Type", required: true },
+          {
+            name: "parentId",
+            label: "Parent location",
+            type: "select",
+            options: locations.map((x) => ({ value: x.id, label: x.name })),
+          },
+        ]}
+        columns={[
+          { key: "code", label: "Code" },
+          { key: "name", label: "Location" },
+          { key: "type", label: "Type" },
+          {
+            key: "parent",
+            label: "Parent",
+            render: (r) => r.parent?.name || "Root",
+          },
+        ]}
+      />
+    </Shell>
+  );
+}
