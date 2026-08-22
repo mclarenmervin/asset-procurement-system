@@ -21,6 +21,8 @@ export type Permission =
   | "assets.move"
   | "documents.manage"
   | "documents.delete"
+  | "tracking.view"
+  | "tracking.manage"
   | "vendors.view"
   | "vendors.manage"
   | "procurement.view"
@@ -50,6 +52,8 @@ const all: Permission[] = [
   "assets.move",
   "documents.manage",
   "documents.delete",
+  "tracking.view",
+  "tracking.manage",
   "vendors.view",
   "vendors.manage",
   "procurement.view",
@@ -83,6 +87,8 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "assets.move",
     "documents.manage",
     "documents.delete",
+    "tracking.view",
+    "tracking.manage",
     "vendors.view",
     "procurement.view",
     "inventory.view",
@@ -117,6 +123,8 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "assets.manage",
     "assets.move",
     "documents.manage",
+    "tracking.view",
+    "tracking.manage",
     "vendors.view",
     "procurement.view",
     "inventory.view",
@@ -143,6 +151,7 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "assets.view",
     "assets.move",
     "documents.manage",
+    "tracking.view",
     "maintenance.view",
     "maintenance.manage",
     "governance.view",
@@ -164,6 +173,7 @@ export const rolePermissions: Record<Role, Permission[]> = {
   AUDITOR: [
     "dashboard.view",
     "assets.view",
+    "tracking.view",
     "vendors.view",
     "procurement.view",
     "inventory.view",

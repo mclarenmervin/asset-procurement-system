@@ -1,0 +1,209 @@
+.trackingMetrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.trackingMetric {
+  padding: 18px;
+}
+.trackingMetric span {
+  color: #879bb5;
+  font-size: 12px;
+}
+.trackingMetric strong {
+  display: block;
+  font-size: 30px;
+  margin-top: 7px;
+}
+.trackingMetric.ok strong {
+  color: #74d6a2;
+}
+.trackingMetric.bad strong {
+  color: #ff8e9e;
+}
+.trackingTabs {
+  margin-top: 18px;
+}
+.trackingHead {
+  margin: 15px 0;
+}
+.trackingHead p {
+  margin: 0;
+}
+.trackingGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.trackerCard {
+  padding: 18px;
+}
+.trackerCard h3 {
+  margin-bottom: 6px;
+}
+.trackerCard p {
+  color: #91a3ba;
+}
+.connection {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #90a1b7;
+}
+.connection:before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #718097;
+  margin-right: 6px;
+}
+.connection.online {
+  color: #72d6a0;
+}
+.connection.online:before {
+  background: #42d58a;
+  box-shadow: 0 0 8px #42d58a;
+}
+.connection.offline {
+  color: #ff8e9e;
+}
+.connection.offline:before {
+  background: #ff5d73;
+}
+.coordinate {
+  display: block;
+  color: #7bb4ff;
+  margin: 14px 0;
+  font-family: monospace;
+}
+.telemetry {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin: 15px 0;
+}
+.telemetry span {
+  background: #0b1a2c;
+  padding: 9px;
+  border-radius: 8px;
+  color: #8296af;
+  font-size: 11px;
+}
+.telemetry b {
+  display: block;
+  color: #dbe9fb;
+  margin-top: 5px;
+}
+.compact {
+  min-width: 210px;
+  margin: 0;
+}
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #020812d9;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.trackingModal {
+  width: min(720px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  padding: 22px;
+}
+.trackingModal h2 {
+  margin: 0;
+}
+.trackingForm {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 20px;
+}
+.trackingForm label {
+  font-size: 12px;
+  color: #9babc0;
+}
+.trackingForm .input {
+  margin-top: 6px;
+}
+.trackingForm .btn {
+  align-self: end;
+}
+.trackingForm .check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: #c7d5e6;
+}
+.credentialBox code {
+  display: block;
+  word-break: break-all;
+  background: #071422;
+  border: 1px solid #28405c;
+  padding: 12px;
+  border-radius: 8px;
+  margin: 6px 0 14px;
+  color: #9ed0ff;
+}
+.historyList {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+.historyList a {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 12px;
+  background: #0a192a;
+  border: 1px solid #263b54;
+  border-radius: 8px;
+  color: #c7d7e9;
+}
+.historyList span {
+  color: #849ab4;
+}
+.trackingAlert {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-left: 4px solid #4a6785;
+  padding: 16px;
+}
+.trackingAlert.warning {
+  border-left-color: #f2b84b;
+}
+.trackingAlert.critical {
+  border-left-color: #fa6579;
+}
+.trackingAlert.read {
+  opacity: 0.65;
+}
+@media (max-width: 950px) {
+  .trackingMetrics {
+    grid-template-columns: 1fr 1fr;
+  }
+  .trackingGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 650px) {
+  .trackingGrid,
+  .trackingForm {
+    grid-template-columns: 1fr;
+  }
+  .trackingAlert,
+  .historyList a {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .trackingMetrics {
+    grid-template-columns: 1fr 1fr;
+  }
+}

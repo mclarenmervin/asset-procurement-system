@@ -18,6 +18,8 @@ import { documentsRouter } from "./routes/documents.js";
 import { governanceRouter } from "./routes/governance.js";
 import { verificationRouter } from "./routes/verification.js";
 import { reportsRouter } from "./routes/reports.js";
+import { trackingRouter } from "./routes/tracking.js";
+import { iotRouter } from "./routes/iot.js";
 import { errors } from "./middleware/errors.js";
 import { prisma } from "./db.js";
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32)
@@ -72,13 +74,11 @@ app.get("/health", async (_, res) => {
     await prisma.$queryRaw`SELECT 1`;
     res.json({ ok: true, service: "Asset Procurement API", database: "ready" });
   } catch {
-    res
-      .status(503)
-      .json({
-        ok: false,
-        service: "Asset Procurement API",
-        database: "unavailable",
-      });
+    res.status(503).json({
+      ok: false,
+      service: "Asset Procurement API",
+      database: "unavailable",
+    });
   }
 });
 app.use("/api/auth", authRouter);
@@ -91,6 +91,8 @@ app.use("/api/maintenance", maintenanceRouter);
 app.use("/api/documents", documentsRouter);
 app.use("/api/governance", governanceRouter);
 app.use("/api/verification", verificationRouter);
+app.use("/api/iot", iotRouter);
+app.use("/api/tracking", trackingRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/masters", mastersRouter);

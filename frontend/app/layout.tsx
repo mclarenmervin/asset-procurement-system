@@ -8,6 +8,7 @@ import "./maintenance/maintenance.css";
 import "./governance/governance.css";
 import "./verification/verification.css";
 import "./reports/reports.css";
+import "./tracking/tracking.css";
 export const metadata = {
   title: "AssetFlow Enterprise",
   description: "Asset, Procurement & Material Management",

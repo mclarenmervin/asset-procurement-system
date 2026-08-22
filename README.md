@@ -6,6 +6,7 @@ AssetFlow Enterprise is a full-stack asset, procurement and material-management 
 
 - Organization, department, hierarchical location, vendor, category and product masters
 - Serialized asset registry with categories, flexible tags, CSV import/export, custodians, append-only movement history and printable URL QR labels that open the complete authorized asset record
+- Vendor-neutral IoT GPS tracking with device provisioning, asset assignment, route history, geofences, offline/battery/speed/tamper/SOS alerts and a built-in hardware simulator
 - Purchase requests, RFQs, vendor quotations, purchase orders and sequential approvals
 - Warehouses, storage bins, GRN inspection, batches, stock ledger, issue and return
 - Maintenance jobs, AMC contracts, compliance records and asset disposal
@@ -85,6 +86,38 @@ Permissions are enforced by the API and reflected in the web interface. `SUPER_A
 | Employee                           | Own/department assets, own requisitions and locations                                    |
 
 The backend refreshes the user's current role from the database on every authenticated request, so access changes take effect immediately. Employees and department heads receive department-scoped asset and requisition data.
+
+## IoT GPS tracking
+
+Open **GPS Tracking** from the application navigation. Asset managers and store managers can register a tracker, assign it to an asset, configure alert thresholds and test it with the built-in simulator. Maintenance and auditor roles receive read access.
+
+When a tracker is registered, AssetFlow displays a device ID and API key once. A future GPS device or vendor gateway sends JSON telemetry to `POST /api/iot/telemetry` with these headers:
+
+```text
+X-Device-ID: tracker-imei-or-device-id
+X-Device-Key: one-time-generated-api-key
+Content-Type: application/json
+```
+
+Example payload:
+
+```json
+{
+  "latitude": 20.2961,
+  "longitude": 85.8245,
+  "speedKph": 42.5,
+  "headingDegrees": 90,
+  "batteryPercent": 76,
+  "signalStrength": -71,
+  "ignition": true,
+  "motion": true,
+  "tamper": false,
+  "sos": false,
+  "recordedAt": "2026-08-22T12:00:00.000Z"
+}
+```
+
+Device keys are stored only as SHA-256 hashes. Telemetry timestamps are idempotent per device, coordinates and sensor ranges are validated, and future timestamps are rejected. Circular geofences can apply to one asset or every tracked asset. The same ingestion service is ready for a later MQTT or tracker-vendor adapter.
 
 ## Environment variables
 

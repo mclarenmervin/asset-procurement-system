@@ -7,6 +7,7 @@ const navigation = [
   ["/dashboard", "Dashboard", "dashboard.view"],
   ["/reports", "Reports & Analytics", "reports.view"],
   ["/assets", "Assets", "assets.view"],
+  ["/tracking", "GPS Tracking", "tracking.view"],
   ["/vendors", "Vendors", "vendors.view"],
   ["/procurement", "Procurement", "procurement.view"],
   ["/inventory", "Stores & Inventory", "inventory.view"],

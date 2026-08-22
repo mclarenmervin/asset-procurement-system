@@ -144,573 +144,763 @@ enum VerificationResult {
   UNAUTHORIZED_MOVEMENT
 }
 
+enum TrackerStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  RETIRED
+}
+
+enum TrackingAlertType {
+  GEOFENCE_EXIT
+  GEOFENCE_ENTRY
+  LOW_BATTERY
+  OFFLINE
+  TAMPER
+  SOS
+  SPEED
+}
+
+enum TrackingAlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
 model Organization {
-  id String @id @default(cuid())
-  name String
-  code String @unique
-  createdAt DateTime @default(now())
-  users User[]
-  departments Department[]
-  locations Location[]
-  vendors Vendor[]
-  categories AssetCategory[]
-  products Product[]
-  assets Asset[]
-  purchaseOrders PurchaseOrder[]
-  goodsReceipts GoodsReceipt[]
-  requisitions PurchaseRequisition[]
-  rfqs RequestForQuotation[]
-  quotations VendorQuotation[]
-  approvals Approval[]
-  warehouses Warehouse[]
-  batches MaterialBatch[]
-  stockTransactions StockTransaction[]
-  stockNotes StockNote[]
-  amcContracts AMCContract[]
-  complianceRecords ComplianceRecord[]
-  disposals DisposalRecord[]
-  assetDocuments AssetDocument[]
-  notifications Notification[]
-  workflowTemplates WorkflowTemplate[]
+  id                   String                @id @default(cuid())
+  name                 String
+  code                 String                @unique
+  createdAt            DateTime              @default(now())
+  users                User[]
+  departments          Department[]
+  locations            Location[]
+  vendors              Vendor[]
+  categories           AssetCategory[]
+  products             Product[]
+  assets               Asset[]
+  purchaseOrders       PurchaseOrder[]
+  goodsReceipts        GoodsReceipt[]
+  requisitions         PurchaseRequisition[]
+  rfqs                 RequestForQuotation[]
+  quotations           VendorQuotation[]
+  approvals            Approval[]
+  warehouses           Warehouse[]
+  batches              MaterialBatch[]
+  stockTransactions    StockTransaction[]
+  stockNotes           StockNote[]
+  amcContracts         AMCContract[]
+  complianceRecords    ComplianceRecord[]
+  disposals            DisposalRecord[]
+  assetDocuments       AssetDocument[]
+  notifications        Notification[]
+  workflowTemplates    WorkflowTemplate[]
   verificationSessions VerificationSession[]
+  trackerDevices       TrackerDevice[]
+  trackingPoints       TrackingPoint[]
+  geofences            Geofence[]
+  trackingAlerts       TrackingAlert[]
 }
+
 model User {
-  id String @id @default(cuid())
-  name String
-  email String @unique
-  passwordHash String
-  role Role @default(EMPLOYEE)
-  organizationId String
-  organization Organization @relation(fields:[organizationId], references:[id])
-  departmentId String?
-  department Department? @relation(fields:[departmentId], references:[id])
-  assetsCustodied Asset[] @relation("AssetCustodian")
-  assetAssignments AssetAssignment[] @relation("AssignedUser")
-  requisitions PurchaseRequisition[] @relation("RequestedBy")
-  notifications Notification[]
-  createdAt DateTime @default(now())
+  id               String                @id @default(cuid())
+  name             String
+  email            String                @unique
+  passwordHash     String
+  role             Role                  @default(EMPLOYEE)
+  organizationId   String
+  organization     Organization          @relation(fields: [organizationId], references: [id])
+  departmentId     String?
+  department       Department?           @relation(fields: [departmentId], references: [id])
+  assetsCustodied  Asset[]               @relation("AssetCustodian")
+  assetAssignments AssetAssignment[]     @relation("AssignedUser")
+  requisitions     PurchaseRequisition[] @relation("RequestedBy")
+  notifications    Notification[]
+  createdAt        DateTime              @default(now())
 }
+
 model Department {
-  id String @id @default(cuid())
-  name String
-  code String
+  id             String       @id @default(cuid())
+  name           String
+  code           String
   organizationId String
-  organization Organization @relation(fields:[organizationId], references:[id])
-  users User[]
-  assets Asset[]
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  users          User[]
+  assets         Asset[]
+
   @@unique([organizationId, code])
 }
+
 model Location {
-  id String @id @default(cuid())
-  name String
-  code String
-  type String
-  organizationId String
-  parentId String?
-  organization Organization @relation(fields:[organizationId], references:[id])
-  parent Location? @relation("LocationTree", fields:[parentId], references:[id])
-  children Location[] @relation("LocationTree")
-  assets Asset[]
-  movementsFrom AssetMovement[] @relation("FromLocation")
-  movementsTo AssetMovement[] @relation("ToLocation")
-  warehouses Warehouse[]
+  id                   String                @id @default(cuid())
+  name                 String
+  code                 String
+  type                 String
+  organizationId       String
+  parentId             String?
+  organization         Organization          @relation(fields: [organizationId], references: [id])
+  parent               Location?             @relation("LocationTree", fields: [parentId], references: [id])
+  children             Location[]            @relation("LocationTree")
+  assets               Asset[]
+  movementsFrom        AssetMovement[]       @relation("FromLocation")
+  movementsTo          AssetMovement[]       @relation("ToLocation")
+  warehouses           Warehouse[]
   verificationSessions VerificationSession[]
-  verificationRecords VerificationRecord[] @relation("ObservedLocation")
+  verificationRecords  VerificationRecord[]  @relation("ObservedLocation")
+
   @@unique([organizationId, code])
 }
+
 model Vendor {
-  id String @id @default(cuid())
-  name String
-  code String
-  gstin String?
-  email String?
-  phone String?
-  address String?
-  rating Float @default(0)
+  id             String            @id @default(cuid())
+  name           String
+  code           String
+  gstin          String?
+  email          String?
+  phone          String?
+  address        String?
+  rating         Float             @default(0)
   organizationId String
-  organization Organization @relation(fields:[organizationId], references:[id])
+  organization   Organization      @relation(fields: [organizationId], references: [id])
   purchaseOrders PurchaseOrder[]
-  assets Asset[]
-  quotations VendorQuotation[]
+  assets         Asset[]
+  quotations     VendorQuotation[]
+
   @@unique([organizationId, code])
 }
+
 model AssetCategory {
-  id String @id @default(cuid())
-  name String
-  code String
-  depreciationRate Float @default(0)
-  organizationId String
-  organization Organization @relation(fields:[organizationId], references:[id])
-  products Product[]
-  assets Asset[]
+  id               String       @id @default(cuid())
+  name             String
+  code             String
+  depreciationRate Float        @default(0)
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id])
+  products         Product[]
+  assets           Asset[]
+
   @@unique([organizationId, code])
 }
+
 model Product {
-  id String @id @default(cuid())
-  name String
-  sku String
-  description String?
-  manufacturer String?
-  organizationId String
-  categoryId String
-  organization Organization @relation(fields:[organizationId], references:[id])
-  category AssetCategory @relation(fields:[categoryId], references:[id])
-  assets Asset[]
-  poItems PurchaseOrderItem[]
-  requisitionItems RequisitionItem[]
-  batches MaterialBatch[]
+  id                String              @id @default(cuid())
+  name              String
+  sku               String
+  description       String?
+  manufacturer      String?
+  organizationId    String
+  categoryId        String
+  organization      Organization        @relation(fields: [organizationId], references: [id])
+  category          AssetCategory       @relation(fields: [categoryId], references: [id])
+  assets            Asset[]
+  poItems           PurchaseOrderItem[]
+  requisitionItems  RequisitionItem[]
+  batches           MaterialBatch[]
   stockTransactions StockTransaction[]
-  stockNoteItems StockNoteItem[]
+  stockNoteItems    StockNoteItem[]
   goodsReceiptItems GoodsReceiptItem[]
+
   @@unique([organizationId, sku])
 }
+
 model PurchaseOrder {
-  id String @id @default(cuid())
-  poNumber String
-  poDate DateTime
-  status POStatus @default(DRAFT)
-  totalAmount Decimal @db.Decimal(14,2)
+  id                   String              @id @default(cuid())
+  poNumber             String
+  poDate               DateTime
+  status               POStatus            @default(DRAFT)
+  totalAmount          Decimal             @db.Decimal(14, 2)
   expectedDeliveryDate DateTime?
-  vendorId String
-  organizationId String
-  vendor Vendor @relation(fields:[vendorId], references:[id])
-  organization Organization @relation(fields:[organizationId], references:[id])
-  items PurchaseOrderItem[]
-  goodsReceipts GoodsReceipt[]
-  assets Asset[]
-  createdAt DateTime @default(now())
+  vendorId             String
+  organizationId       String
+  vendor               Vendor              @relation(fields: [vendorId], references: [id])
+  organization         Organization        @relation(fields: [organizationId], references: [id])
+  items                PurchaseOrderItem[]
+  goodsReceipts        GoodsReceipt[]
+  assets               Asset[]
+  createdAt            DateTime            @default(now())
+
   @@unique([organizationId, poNumber])
 }
+
 model PurchaseOrderItem {
-  id String @id @default(cuid())
+  id              String        @id @default(cuid())
   purchaseOrderId String
-  productId String
-  quantity Int
-  unitPrice Decimal @db.Decimal(14,2)
-  purchaseOrder PurchaseOrder @relation(fields:[purchaseOrderId], references:[id], onDelete:Cascade)
-  product Product @relation(fields:[productId], references:[id])
+  productId       String
+  quantity        Int
+  unitPrice       Decimal       @db.Decimal(14, 2)
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product         Product       @relation(fields: [productId], references: [id])
 }
+
 model PurchaseRequisition {
-  id String @id @default(cuid())
+  id                String                @id @default(cuid())
   requisitionNumber String
-  title String
-  justification String?
-  neededBy DateTime?
-  status RequisitionStatus @default(DRAFT)
-  organizationId String
+  title             String
+  justification     String?
+  neededBy          DateTime?
+  status            RequisitionStatus     @default(DRAFT)
+  organizationId    String
   requestedByUserId String
-  organization Organization @relation(fields:[organizationId], references:[id])
-  requestedBy User @relation("RequestedBy", fields:[requestedByUserId], references:[id])
-  items RequisitionItem[]
-  rfqs RequestForQuotation[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  organization      Organization          @relation(fields: [organizationId], references: [id])
+  requestedBy       User                  @relation("RequestedBy", fields: [requestedByUserId], references: [id])
+  items             RequisitionItem[]
+  rfqs              RequestForQuotation[]
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
   @@unique([organizationId, requisitionNumber])
 }
+
 model RequisitionItem {
-  id String @id @default(cuid())
-  requisitionId String
-  productId String
-  quantity Int
-  estimatedUnitPrice Decimal? @db.Decimal(14,2)
-  remarks String?
-  requisition PurchaseRequisition @relation(fields:[requisitionId], references:[id], onDelete:Cascade)
-  product Product @relation(fields:[productId], references:[id])
+  id                 String              @id @default(cuid())
+  requisitionId      String
+  productId          String
+  quantity           Int
+  estimatedUnitPrice Decimal?            @db.Decimal(14, 2)
+  remarks            String?
+  requisition        PurchaseRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  product            Product             @relation(fields: [productId], references: [id])
 }
+
 model RequestForQuotation {
-  id String @id @default(cuid())
-  rfqNumber String
-  title String
-  closingDate DateTime
-  status RFQStatus @default(DRAFT)
+  id             String               @id @default(cuid())
+  rfqNumber      String
+  title          String
+  closingDate    DateTime
+  status         RFQStatus            @default(DRAFT)
   organizationId String
-  requisitionId String?
-  organization Organization @relation(fields:[organizationId], references:[id])
-  requisition PurchaseRequisition? @relation(fields:[requisitionId], references:[id])
-  quotations VendorQuotation[]
-  createdAt DateTime @default(now())
+  requisitionId  String?
+  organization   Organization         @relation(fields: [organizationId], references: [id])
+  requisition    PurchaseRequisition? @relation(fields: [requisitionId], references: [id])
+  quotations     VendorQuotation[]
+  createdAt      DateTime             @default(now())
+
   @@unique([organizationId, rfqNumber])
 }
+
 model VendorQuotation {
-  id String @id @default(cuid())
+  id              String              @id @default(cuid())
   quotationNumber String
-  quotedAmount Decimal @db.Decimal(14,2)
-  deliveryDays Int?
-  validityDate DateTime?
-  notes String?
-  status QuotationStatus @default(SUBMITTED)
-  organizationId String
-  rfqId String
-  vendorId String
-  organization Organization @relation(fields:[organizationId], references:[id])
-  rfq RequestForQuotation @relation(fields:[rfqId], references:[id], onDelete:Cascade)
-  vendor Vendor @relation(fields:[vendorId], references:[id])
-  createdAt DateTime @default(now())
+  quotedAmount    Decimal             @db.Decimal(14, 2)
+  deliveryDays    Int?
+  validityDate    DateTime?
+  notes           String?
+  status          QuotationStatus     @default(SUBMITTED)
+  organizationId  String
+  rfqId           String
+  vendorId        String
+  organization    Organization        @relation(fields: [organizationId], references: [id])
+  rfq             RequestForQuotation @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  vendor          Vendor              @relation(fields: [vendorId], references: [id])
+  createdAt       DateTime            @default(now())
+
   @@unique([organizationId, quotationNumber])
 }
+
 model GoodsReceipt {
-  id String @id @default(cuid())
-  grnNumber String
-  receiptDate DateTime @default(now())
-  status GRNStatus @default(INSPECTION_PENDING)
-  invoiceNumber String?
+  id              String             @id @default(cuid())
+  grnNumber       String
+  receiptDate     DateTime           @default(now())
+  status          GRNStatus          @default(INSPECTION_PENDING)
+  invoiceNumber   String?
   purchaseOrderId String
-  organizationId String
-  purchaseOrder PurchaseOrder @relation(fields:[purchaseOrderId], references:[id])
-  organization Organization @relation(fields:[organizationId], references:[id])
-  items GoodsReceiptItem[]
-  warehouseId String?
-  warehouse Warehouse? @relation(fields:[warehouseId], references:[id])
+  organizationId  String
+  purchaseOrder   PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id])
+  organization    Organization       @relation(fields: [organizationId], references: [id])
+  items           GoodsReceiptItem[]
+  warehouseId     String?
+  warehouse       Warehouse?         @relation(fields: [warehouseId], references: [id])
+
   @@unique([organizationId, grnNumber])
 }
+
 model GoodsReceiptItem {
-  id String @id @default(cuid())
+  id             String       @id @default(cuid())
   goodsReceiptId String
-  productName String
-  receivedQty Int
-  acceptedQty Int @default(0)
-  rejectedQty Int @default(0)
-  remarks String?
-  productId String?
-  batchNumber String?
-  expiryDate DateTime?
-  binId String?
-  goodsReceipt GoodsReceipt @relation(fields:[goodsReceiptId], references:[id], onDelete:Cascade)
-  product Product? @relation(fields:[productId], references:[id])
-  bin StorageBin? @relation(fields:[binId], references:[id])
+  productName    String
+  receivedQty    Int
+  acceptedQty    Int          @default(0)
+  rejectedQty    Int          @default(0)
+  remarks        String?
+  productId      String?
+  batchNumber    String?
+  expiryDate     DateTime?
+  binId          String?
+  goodsReceipt   GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  product        Product?     @relation(fields: [productId], references: [id])
+  bin            StorageBin?  @relation(fields: [binId], references: [id])
 }
+
 model Warehouse {
-  id String @id @default(cuid())
-  name String
-  code String
+  id             String             @id @default(cuid())
+  name           String
+  code           String
   organizationId String
-  locationId String?
-  organization Organization @relation(fields:[organizationId], references:[id])
-  location Location? @relation(fields:[locationId], references:[id])
-  bins StorageBin[]
-  batches MaterialBatch[]
-  transactions StockTransaction[]
-  receipts GoodsReceipt[]
-  stockNotes StockNote[]
+  locationId     String?
+  organization   Organization       @relation(fields: [organizationId], references: [id])
+  location       Location?          @relation(fields: [locationId], references: [id])
+  bins           StorageBin[]
+  batches        MaterialBatch[]
+  transactions   StockTransaction[]
+  receipts       GoodsReceipt[]
+  stockNotes     StockNote[]
+
   @@unique([organizationId, code])
 }
+
 model StorageBin {
-  id String @id @default(cuid())
-  name String
-  code String
-  warehouseId String
-  warehouse Warehouse @relation(fields:[warehouseId], references:[id], onDelete:Cascade)
-  batches MaterialBatch[]
+  id           String             @id @default(cuid())
+  name         String
+  code         String
+  warehouseId  String
+  warehouse    Warehouse          @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  batches      MaterialBatch[]
   transactions StockTransaction[]
   receiptItems GoodsReceiptItem[]
+
   @@unique([warehouseId, code])
 }
+
 model MaterialBatch {
-  id String @id @default(cuid())
-  batchNumber String
-  quantity Int @default(0)
-  expiryDate DateTime?
+  id             String             @id @default(cuid())
+  batchNumber    String
+  quantity       Int                @default(0)
+  expiryDate     DateTime?
   organizationId String
-  productId String
-  warehouseId String
-  binId String?
-  organization Organization @relation(fields:[organizationId], references:[id])
-  product Product @relation(fields:[productId], references:[id])
-  warehouse Warehouse @relation(fields:[warehouseId], references:[id])
-  bin StorageBin? @relation(fields:[binId], references:[id])
-  transactions StockTransaction[]
+  productId      String
+  warehouseId    String
+  binId          String?
+  organization   Organization       @relation(fields: [organizationId], references: [id])
+  product        Product            @relation(fields: [productId], references: [id])
+  warehouse      Warehouse          @relation(fields: [warehouseId], references: [id])
+  bin            StorageBin?        @relation(fields: [binId], references: [id])
+  transactions   StockTransaction[]
   stockNoteItems StockNoteItem[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
   @@unique([organizationId, warehouseId, productId, batchNumber])
 }
+
 model StockTransaction {
-  id String @id @default(cuid())
-  type StockTransactionType
-  quantity Int
-  balanceAfter Int
-  referenceType String?
-  referenceId String?
-  remarks String?
-  organizationId String
-  productId String
-  warehouseId String
-  binId String?
-  batchId String?
+  id                String               @id @default(cuid())
+  type              StockTransactionType
+  quantity          Int
+  balanceAfter      Int
+  referenceType     String?
+  referenceId       String?
+  remarks           String?
+  organizationId    String
+  productId         String
+  warehouseId       String
+  binId             String?
+  batchId           String?
   performedByUserId String?
-  organization Organization @relation(fields:[organizationId], references:[id])
-  product Product @relation(fields:[productId], references:[id])
-  warehouse Warehouse @relation(fields:[warehouseId], references:[id])
-  bin StorageBin? @relation(fields:[binId], references:[id])
-  batch MaterialBatch? @relation(fields:[batchId], references:[id])
-  createdAt DateTime @default(now())
+  organization      Organization         @relation(fields: [organizationId], references: [id])
+  product           Product              @relation(fields: [productId], references: [id])
+  warehouse         Warehouse            @relation(fields: [warehouseId], references: [id])
+  bin               StorageBin?          @relation(fields: [binId], references: [id])
+  batch             MaterialBatch?       @relation(fields: [batchId], references: [id])
+  createdAt         DateTime             @default(now())
+
   @@index([organizationId, productId, warehouseId, createdAt])
 }
+
 model StockNote {
-  id String @id @default(cuid())
-  noteNumber String
-  type StockNoteType
-  status StockNoteStatus @default(DRAFT)
-  recipient String?
-  remarks String?
+  id             String          @id @default(cuid())
+  noteNumber     String
+  type           StockNoteType
+  status         StockNoteStatus @default(DRAFT)
+  recipient      String?
+  remarks        String?
   organizationId String
-  warehouseId String
-  organization Organization @relation(fields:[organizationId], references:[id])
-  warehouse Warehouse @relation(fields:[warehouseId], references:[id])
-  items StockNoteItem[]
-  createdAt DateTime @default(now())
-  postedAt DateTime?
+  warehouseId    String
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  warehouse      Warehouse       @relation(fields: [warehouseId], references: [id])
+  items          StockNoteItem[]
+  createdAt      DateTime        @default(now())
+  postedAt       DateTime?
+
   @@unique([organizationId, noteNumber])
 }
+
 model StockNoteItem {
-  id String @id @default(cuid())
+  id          String         @id @default(cuid())
   stockNoteId String
-  productId String
-  batchId String?
-  quantity Int
-  stockNote StockNote @relation(fields:[stockNoteId], references:[id], onDelete:Cascade)
-  product Product @relation(fields:[productId], references:[id])
-  batch MaterialBatch? @relation(fields:[batchId], references:[id])
+  productId   String
+  batchId     String?
+  quantity    Int
+  stockNote   StockNote      @relation(fields: [stockNoteId], references: [id], onDelete: Cascade)
+  product     Product        @relation(fields: [productId], references: [id])
+  batch       MaterialBatch? @relation(fields: [batchId], references: [id])
 }
+
 model Asset {
-  id String @id @default(cuid())
-  assetTag String
-  serialNumber String?
-  qrValue String @unique
-  tags String[] @default([])
-  status AssetStatus @default(IN_STOCK)
-  purchasePrice Decimal? @db.Decimal(14,2)
-  purchaseDate DateTime?
-  commissioningDate DateTime?
-  warrantyEndDate DateTime?
-  expiryDate DateTime?
-  notes String?
-  organizationId String
-  productId String
-  categoryId String
-  vendorId String?
-  purchaseOrderId String?
-  departmentId String?
-  currentLocationId String?
-  custodianId String?
-  organization Organization @relation(fields:[organizationId], references:[id])
-  product Product @relation(fields:[productId], references:[id])
-  category AssetCategory @relation(fields:[categoryId], references:[id])
-  vendor Vendor? @relation(fields:[vendorId], references:[id])
-  purchaseOrder PurchaseOrder? @relation(fields:[purchaseOrderId], references:[id])
-  department Department? @relation(fields:[departmentId], references:[id])
-  currentLocation Location? @relation(fields:[currentLocationId], references:[id])
-  custodian User? @relation("AssetCustodian", fields:[custodianId], references:[id])
-  movements AssetMovement[]
-  maintenance MaintenanceRecord[]
-  documents AssetDocument[]
-  assignments AssetAssignment[]
-  complianceRecords ComplianceRecord[]
-  disposal DisposalRecord?
+  id                  String               @id @default(cuid())
+  assetTag            String
+  serialNumber        String?
+  qrValue             String               @unique
+  tags                String[]             @default([])
+  status              AssetStatus          @default(IN_STOCK)
+  purchasePrice       Decimal?             @db.Decimal(14, 2)
+  purchaseDate        DateTime?
+  commissioningDate   DateTime?
+  warrantyEndDate     DateTime?
+  expiryDate          DateTime?
+  notes               String?
+  organizationId      String
+  productId           String
+  categoryId          String
+  vendorId            String?
+  purchaseOrderId     String?
+  departmentId        String?
+  currentLocationId   String?
+  custodianId         String?
+  organization        Organization         @relation(fields: [organizationId], references: [id])
+  product             Product              @relation(fields: [productId], references: [id])
+  category            AssetCategory        @relation(fields: [categoryId], references: [id])
+  vendor              Vendor?              @relation(fields: [vendorId], references: [id])
+  purchaseOrder       PurchaseOrder?       @relation(fields: [purchaseOrderId], references: [id])
+  department          Department?          @relation(fields: [departmentId], references: [id])
+  currentLocation     Location?            @relation(fields: [currentLocationId], references: [id])
+  custodian           User?                @relation("AssetCustodian", fields: [custodianId], references: [id])
+  movements           AssetMovement[]
+  maintenance         MaintenanceRecord[]
+  documents           AssetDocument[]
+  assignments         AssetAssignment[]
+  complianceRecords   ComplianceRecord[]
+  disposal            DisposalRecord?
   verificationRecords VerificationRecord[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  trackerDevice       TrackerDevice?
+  geofences           Geofence[]
+  trackingAlerts      TrackingAlert[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
   @@unique([organizationId, assetTag])
 }
+
 model AssetAssignment {
-  id String @id @default(cuid())
-  assetId String
-  userId String
+  id               String    @id @default(cuid())
+  assetId          String
+  userId           String
   assignedByUserId String?
-  assignedAt DateTime @default(now())
-  returnedAt DateTime?
-  remarks String?
-  asset Asset @relation(fields:[assetId], references:[id], onDelete:Cascade)
-  user User @relation("AssignedUser", fields:[userId], references:[id])
+  assignedAt       DateTime  @default(now())
+  returnedAt       DateTime?
+  remarks          String?
+  asset            Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  user             User      @relation("AssignedUser", fields: [userId], references: [id])
+
   @@index([assetId, assignedAt])
 }
+
 model AssetMovement {
-  id String @id @default(cuid())
-  assetId String
-  type MovementType
+  id             String       @id @default(cuid())
+  assetId        String
+  type           MovementType
   fromLocationId String?
-  toLocationId String?
-  movedByUserId String?
-  remarks String?
-  movedAt DateTime @default(now())
-  asset Asset @relation(fields:[assetId], references:[id], onDelete:Cascade)
-  fromLocation Location? @relation("FromLocation", fields:[fromLocationId], references:[id])
-  toLocation Location? @relation("ToLocation", fields:[toLocationId], references:[id])
+  toLocationId   String?
+  movedByUserId  String?
+  remarks        String?
+  movedAt        DateTime     @default(now())
+  asset          Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  fromLocation   Location?    @relation("FromLocation", fields: [fromLocationId], references: [id])
+  toLocation     Location?    @relation("ToLocation", fields: [toLocationId], references: [id])
 }
+
 model MaintenanceRecord {
-  id String @id @default(cuid())
-  assetId String
-  type String
-  description String
-  vendorName String?
-  cost Decimal? @db.Decimal(14,2)
-  startedAt DateTime
-  completedAt DateTime?
-  nextDueDate DateTime?
-  status MaintenanceStatus @default(OPEN)
-  ticketNumber String?
-  priority String @default("MEDIUM")
+  id            String            @id @default(cuid())
+  assetId       String
+  type          String
+  description   String
+  vendorName    String?
+  cost          Decimal?          @db.Decimal(14, 2)
+  startedAt     DateTime
+  completedAt   DateTime?
+  nextDueDate   DateTime?
+  status        MaintenanceStatus @default(OPEN)
+  ticketNumber  String?
+  priority      String            @default("MEDIUM")
   amcContractId String?
-  asset Asset @relation(fields:[assetId], references:[id], onDelete:Cascade)
-  amcContract AMCContract? @relation(fields:[amcContractId], references:[id])
+  asset         Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  amcContract   AMCContract?      @relation(fields: [amcContractId], references: [id])
 }
+
 model AMCContract {
-  id String @id @default(cuid())
-  contractNumber String
-  providerName String
-  startDate DateTime
-  endDate DateTime
-  amount Decimal? @db.Decimal(14,2)
-  scope String?
-  organizationId String
-  organization Organization @relation(fields:[organizationId], references:[id])
+  id                 String              @id @default(cuid())
+  contractNumber     String
+  providerName       String
+  startDate          DateTime
+  endDate            DateTime
+  amount             Decimal?            @db.Decimal(14, 2)
+  scope              String?
+  organizationId     String
+  organization       Organization        @relation(fields: [organizationId], references: [id])
   maintenanceRecords MaintenanceRecord[]
-  createdAt DateTime @default(now())
+  createdAt          DateTime            @default(now())
+
   @@unique([organizationId, contractNumber])
 }
+
 model ComplianceRecord {
-  id String @id @default(cuid())
-  type ComplianceType
+  id              String         @id @default(cuid())
+  type            ComplianceType
   referenceNumber String?
-  providerName String?
-  startDate DateTime?
-  dueDate DateTime
-  completedDate DateTime?
-  notes String?
-  organizationId String
-  assetId String
-  organization Organization @relation(fields:[organizationId], references:[id])
-  asset Asset @relation(fields:[assetId], references:[id], onDelete:Cascade)
-  createdAt DateTime @default(now())
+  providerName    String?
+  startDate       DateTime?
+  dueDate         DateTime
+  completedDate   DateTime?
+  notes           String?
+  organizationId  String
+  assetId         String
+  organization    Organization   @relation(fields: [organizationId], references: [id])
+  asset           Asset          @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  createdAt       DateTime       @default(now())
+
   @@index([organizationId, dueDate])
 }
+
 model DisposalRecord {
-  id String @id @default(cuid())
-  method String
-  reason String
-  status DisposalStatus @default(PROPOSED)
-  proposedValue Decimal? @db.Decimal(14,2)
-  realizedValue Decimal? @db.Decimal(14,2)
-  proposedAt DateTime @default(now())
-  approvedAt DateTime?
-  completedAt DateTime?
+  id             String         @id @default(cuid())
+  method         String
+  reason         String
+  status         DisposalStatus @default(PROPOSED)
+  proposedValue  Decimal?       @db.Decimal(14, 2)
+  realizedValue  Decimal?       @db.Decimal(14, 2)
+  proposedAt     DateTime       @default(now())
+  approvedAt     DateTime?
+  completedAt    DateTime?
   organizationId String
-  assetId String @unique
-  organization Organization @relation(fields:[organizationId], references:[id])
-  asset Asset @relation(fields:[assetId], references:[id], onDelete:Cascade)
+  assetId        String         @unique
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  asset          Asset          @relation(fields: [assetId], references: [id], onDelete: Cascade)
 }
+
 model AssetDocument {
-  id String @id @default(cuid())
-  assetId String
-  type String
-  name String
-  url String
-  storageKey String?
-  mimeType String?
-  size Int?
-  organizationId String
+  id               String       @id @default(cuid())
+  assetId          String
+  type             String
+  name             String
+  url              String
+  storageKey       String?
+  mimeType         String?
+  size             Int?
+  organizationId   String
   uploadedByUserId String?
-  uploadedAt DateTime @default(now())
-  asset Asset @relation(fields:[assetId], references:[id], onDelete:Cascade)
-  organization Organization @relation(fields:[organizationId], references:[id])
+  uploadedAt       DateTime     @default(now())
+  asset            Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  organization     Organization @relation(fields: [organizationId], references: [id])
 }
+
 model Notification {
-  id String @id @default(cuid())
-  title String
-  message String
-  type String
-  link String?
-  readAt DateTime?
-  dedupeKey String? @unique
+  id             String       @id @default(cuid())
+  title          String
+  message        String
+  type           String
+  link           String?
+  readAt         DateTime?
+  dedupeKey      String?      @unique
   organizationId String
-  userId String?
-  organization Organization @relation(fields:[organizationId], references:[id])
-  user User? @relation(fields:[userId], references:[id], onDelete:Cascade)
-  createdAt DateTime @default(now())
+  userId         String?
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  user           User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
   @@index([organizationId, createdAt])
 }
+
 model WorkflowTemplate {
-  id String @id @default(cuid())
-  name String
-  entityType String
-  description String?
-  active Boolean @default(true)
+  id             String         @id @default(cuid())
+  name           String
+  entityType     String
+  description    String?
+  active         Boolean        @default(true)
   organizationId String
-  organization Organization @relation(fields:[organizationId], references:[id])
-  steps WorkflowStep[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  steps          WorkflowStep[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
   @@unique([organizationId, name])
 }
+
 model WorkflowStep {
-  id String @id @default(cuid())
+  id                 String           @id @default(cuid())
   workflowTemplateId String
-  step Int
-  name String
-  approverRole Role
-  minimumAmount Decimal? @db.Decimal(14,2)
-  workflowTemplate WorkflowTemplate @relation(fields:[workflowTemplateId], references:[id], onDelete:Cascade)
+  step               Int
+  name               String
+  approverRole       Role
+  minimumAmount      Decimal?         @db.Decimal(14, 2)
+  workflowTemplate   WorkflowTemplate @relation(fields: [workflowTemplateId], references: [id], onDelete: Cascade)
+
   @@unique([workflowTemplateId, step])
 }
+
 model VerificationSession {
-  id String @id @default(cuid())
-  sessionNumber String
-  name String
-  status VerificationStatus @default(PLANNED)
-  notes String?
-  organizationId String
-  locationId String?
+  id              String               @id @default(cuid())
+  sessionNumber   String
+  name            String
+  status          VerificationStatus   @default(PLANNED)
+  notes           String?
+  organizationId  String
+  locationId      String?
   startedByUserId String?
-  startedAt DateTime?
-  completedAt DateTime?
-  organization Organization @relation(fields:[organizationId], references:[id])
-  location Location? @relation(fields:[locationId], references:[id])
-  records VerificationRecord[]
-  createdAt DateTime @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+  organization    Organization         @relation(fields: [organizationId], references: [id])
+  location        Location?            @relation(fields: [locationId], references: [id])
+  records         VerificationRecord[]
+  createdAt       DateTime             @default(now())
+
   @@unique([organizationId, sessionNumber])
 }
+
 model VerificationRecord {
-  id String @id @default(cuid())
-  result VerificationResult
+  id                 String              @id @default(cuid())
+  result             VerificationResult
   expectedLocationId String?
   observedLocationId String?
-  latitude Float?
-  longitude Float?
-  notes String?
-  sessionId String
-  assetId String
-  scannedByUserId String?
-  scannedAt DateTime @default(now())
-  session VerificationSession @relation(fields:[sessionId], references:[id], onDelete:Cascade)
-  asset Asset @relation(fields:[assetId], references:[id], onDelete:Cascade)
-  observedLocation Location? @relation("ObservedLocation", fields:[observedLocationId], references:[id])
+  latitude           Float?
+  longitude          Float?
+  notes              String?
+  sessionId          String
+  assetId            String
+  scannedByUserId    String?
+  scannedAt          DateTime            @default(now())
+  session            VerificationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  asset              Asset               @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  observedLocation   Location?           @relation("ObservedLocation", fields: [observedLocationId], references: [id])
+
   @@unique([sessionId, assetId])
   @@index([sessionId, result])
 }
+
 model Approval {
-  id String @id @default(cuid())
-  entityType String
-  entityId String
-  organizationId String
+  id                String         @id @default(cuid())
+  entityType        String
+  entityId          String
+  organizationId    String
   requestedByUserId String?
-  step Int
-  approverRole Role
-  status ApprovalStatus @default(PENDING)
-  comments String?
-  actedAt DateTime?
-  createdAt DateTime @default(now())
-  organization Organization @relation(fields:[organizationId], references:[id])
+  step              Int
+  approverRole      Role
+  status            ApprovalStatus @default(PENDING)
+  comments          String?
+  actedAt           DateTime?
+  createdAt         DateTime       @default(now())
+  organization      Organization   @relation(fields: [organizationId], references: [id])
+
   @@index([organizationId, entityType, entityId])
 }
+
 model AuditLog {
-  id String @id @default(cuid())
+  id             String   @id @default(cuid())
   organizationId String
-  userId String?
-  action String
-  entityType String
-  entityId String?
-  beforeJson Json?
-  afterJson Json?
-  ipAddress String?
-  createdAt DateTime @default(now())
+  userId         String?
+  action         String
+  entityType     String
+  entityId       String?
+  beforeJson     Json?
+  afterJson      Json?
+  ipAddress      String?
+  createdAt      DateTime @default(now())
+}
+
+model TrackerDevice {
+  id                  String          @id @default(cuid())
+  deviceUid           String          @unique
+  name                String
+  model               String?
+  protocol            String          @default("HTTPS")
+  simNumber           String?
+  secretHash          String
+  status              TrackerStatus   @default(ACTIVE)
+  batteryThreshold    Int             @default(20)
+  offlineAfterMinutes Int             @default(30)
+  speedLimitKph       Float?
+  lastSeenAt          DateTime?
+  lastTelemetryAt     DateTime?
+  lastLatitude        Float?
+  lastLongitude       Float?
+  lastSpeedKph        Float?
+  lastBatteryPercent  Int?
+  organizationId      String
+  assetId             String?         @unique
+  organization        Organization    @relation(fields: [organizationId], references: [id])
+  asset               Asset?          @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  points              TrackingPoint[]
+  alerts              TrackingAlert[]
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@index([organizationId, status])
+  @@index([organizationId, lastSeenAt])
+}
+
+model TrackingPoint {
+  id             String        @id @default(cuid())
+  latitude       Float
+  longitude      Float
+  altitudeMeters Float?
+  accuracyMeters Float?
+  speedKph       Float?
+  headingDegrees Float?
+  batteryPercent Int?
+  signalStrength Int?
+  ignition       Boolean?
+  motion         Boolean?
+  temperatureC   Float?
+  recordedAt     DateTime
+  receivedAt     DateTime      @default(now())
+  rawPayload     Json?
+  deviceId       String
+  organizationId String
+  device         TrackerDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+
+  @@unique([deviceId, recordedAt])
+  @@index([organizationId, recordedAt])
+  @@index([deviceId, recordedAt])
+}
+
+model Geofence {
+  id             String          @id @default(cuid())
+  name           String
+  latitude       Float
+  longitude      Float
+  radiusMeters   Float
+  active         Boolean         @default(true)
+  organizationId String
+  assetId        String?
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  asset          Asset?          @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  alerts         TrackingAlert[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([organizationId, active])
+}
+
+model TrackingAlert {
+  id                   String                @id @default(cuid())
+  type                 TrackingAlertType
+  severity             TrackingAlertSeverity
+  title                String
+  message              String
+  latitude             Float?
+  longitude            Float?
+  acknowledgedAt       DateTime?
+  acknowledgedByUserId String?
+  resolvedAt           DateTime?
+  deviceId             String
+  assetId              String?
+  geofenceId           String?
+  organizationId       String
+  device               TrackerDevice         @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  asset                Asset?                @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  geofence             Geofence?             @relation(fields: [geofenceId], references: [id], onDelete: SetNull)
+  organization         Organization          @relation(fields: [organizationId], references: [id])
+  createdAt            DateTime              @default(now())
+
+  @@index([organizationId, acknowledgedAt, createdAt])
+  @@index([deviceId, type, resolvedAt])
 }
