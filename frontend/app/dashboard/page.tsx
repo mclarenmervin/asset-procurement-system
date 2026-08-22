@@ -20,20 +20,48 @@ export default function Dashboard() {
       .catch(() => (location.href = "/login"));
   }, []);
   return (
-    <Shell title="Operations Dashboard">
+    <Shell title="Command Centre">
       {!d ? (
         <p>Loading...</p>
       ) : (
         <>
-          <div className="grid">
+          <section className="commandHero">
+            <div>
+              <span className="commandEyebrow">
+                Enterprise operations overview
+              </span>
+              <h2>Good to see you. Here is your operational position.</h2>
+              <p>
+                Monitor asset custody, procurement activity and compliance
+                exceptions across the organization.
+              </p>
+            </div>
+            <div className="commandActions">
+              <Link className="btn" href="/assets">
+                Open asset registry
+              </Link>
+              <Link className="secondaryBtn" href="/reports">
+                View executive reports
+              </Link>
+            </div>
+          </section>
+          <div className="grid dashboardMetrics">
             <Card n={d.assets} t="Tracked Assets" href="/assets" />
             <Card n={d.vendors} t="Active Vendors" href="/vendors" />
             <Card n={d.openPurchaseOrders} t="Open POs" href="/procurement" />
             <Card n={d.maintenance} t="Maintenance" href="/maintenance" />
             <Card n={d.expiringSoon} t="Expiring ≤ 90 days" href="/assets" />
           </div>
-          <div className="card section tableWrap">
-            <h3>Recent Asset Movement</h3>
+          <div className="card section tableWrap dashboardTable">
+            <div className="sectionHead">
+              <div>
+                <span className="sectionKicker">Custody ledger</span>
+                <h3>Recent asset movement</h3>
+              </div>
+              <Link href="/assets" className="textLink">
+                View all assets →
+              </Link>
+            </div>
             <FilterBar
               query={query}
               setQuery={setQuery}
@@ -88,7 +116,7 @@ function Card({ n, t, href }: { n: any; t: string; href: string }) {
     <Link href={href} className="card metricCard">
       <div className="muted">{t}</div>
       <div className="metric">{n}</div>
-      <span>View details →</span>
+      <span>Explore module →</span>
     </Link>
   );
 }

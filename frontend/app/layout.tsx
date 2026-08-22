@@ -9,9 +9,11 @@ import "./governance/governance.css";
 import "./verification/verification.css";
 import "./reports/reports.css";
 import "./tracking/tracking.css";
+import "./theme.css";
 export const metadata = {
-  title: "AssetFlow Enterprise",
-  description: "Asset, Procurement & Material Management",
+  title: "AssetFlow | Enterprise Asset Lifecycle Management",
+  description:
+    "Unified asset, procurement, inventory, maintenance and governance operations.",
 };
 export default function RootLayout({
   children,

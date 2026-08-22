@@ -20,8 +20,11 @@ export default function Home() {
   return (
     <main className="landing">
       <header className="landingNav">
-        <div className="brand">
-          AssetFlow<small>ENTERPRISE MANAGEMENT</small>
+        <div className="brand landingBrand">
+          <span className="brandMark">AF</span>
+          <span>
+            AssetFlow<small>ENTERPRISE OPERATIONS</small>
+          </span>
         </div>
         <div className="navActions">
           <Link className="ghost" href="/login">
@@ -34,26 +37,33 @@ export default function Home() {
       </header>
       <section className="hero">
         <div>
-          <span className="eyebrow">ONE SYSTEM · COMPLETE TRACEABILITY</span>
-          <h1>Control every asset, purchase and material movement.</h1>
+          <span className="eyebrow">
+            BUILT FOR LARGE-SCALE PUBLIC ENTERPRISE
+          </span>
+          <h1>One command centre for every asset and operation.</h1>
           <p>
-            Connect procurement, vendors, stores, locations, maintenance and
-            audit history in one secure workspace built for complex
+            Unify procurement, custody, inventory, maintenance, GPS tracking and
+            audit assurance in one secure platform designed for complex
             organizations.
           </p>
           <div className="heroActions">
             <Link className="btn large" href="/signup">
-              Create your workspace
+              Explore the platform
             </Link>
             <Link className="ghost large" href="/login">
-              Open demo
+              Sign in to demo
             </Link>
           </div>
         </div>
         <div className="heroPanel">
-          <div className="pulse">LIVE OPERATIONS</div>
+          <div className="panelTop">
+            <div className="pulse">
+              <i /> LIVE OPERATIONS
+            </div>
+            <span>22 AUG 2026</span>
+          </div>
           <strong>₹24.8 Cr</strong>
-          <span>Assets under management</span>
+          <span>Asset value under governance</span>
           <div className="miniGrid">
             <div>
               <b>12,480</b>
@@ -73,6 +83,12 @@ export default function Home() {
             </div>
           </div>
         </div>
+      </section>
+      <section className="trustStrip">
+        <span>Unified governance</span>
+        <span>Role-based access</span>
+        <span>Complete audit trail</span>
+        <span>IoT ready</span>
       </section>
       <section className="features">
         {features.map(([n, t, d]) => (
